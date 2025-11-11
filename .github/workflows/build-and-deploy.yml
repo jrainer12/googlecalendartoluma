@@ -1,0 +1,316 @@
+name: Build and Deploy All Environments
+
+on:
+  workflow_dispatch:
+    inputs:
+      modules:
+        description: 'Comma-separated list of modules to build (e.g., "api,cronjob")'
+        required: true
+        default: 'api,cronjob'
+      environments:
+        description: 'Comma-separated list of environments to deploy (e.g., "dev,prod")'
+        required: true
+        default: 'dev'
+      releaseBuild:
+        description: 'Deploy As Release Build'
+        required: false
+        default: 'false'
+        type: boolean
+      runUnitTests:
+        description: 'Run Unit Tests During Docker Build'
+        required: true
+        default: false
+        type: boolean
+      imageRegistry:
+        description: 'Docker image registry (e.g., ghcr.io, docker.io, or Azure ACR)'
+        required: true
+        default: 'ghcr.io'
+      imageNamespace:
+        description: 'Docker image namespace/organization'
+        required: true
+        default: '${{ github.repository_owner }}'
+
+env:
+  # Default environment variables
+  IMAGE_REGISTRY: ${{ github.event.inputs.imageRegistry }}
+  IMAGE_NAMESPACE: ${{ github.event.inputs.imageNamespace }}
+
+jobs:
+  Prepare_Data:
+    name: Prepare Matrix Json
+    runs-on: ubuntu-latest
+    outputs:
+      modules_json: ${{ steps.construct-modules-only-matrix.outputs.modules_json }}
+      matrix_json: ${{ steps.construct-json-matrix-for-modules.outputs.matrix_json }}
+    steps:
+      - id: construct-modules-only-matrix
+        run: |
+          MODULES_JSON='{"include":['
+          IFS=',' read -ra MODULES <<< "${{ github.event.inputs.modules }}"
+          for module in "${MODULES[@]}"; do
+            MODULES_JSON+='{"module":"'"$module"'","module_lower":"'"$(echo $module | tr '[:upper:]' '[:lower:]')"'"},'
+          done
+          MODULES_JSON=${MODULES_JSON%,}
+          MODULES_JSON+=']}'
+          echo "Modules JSON: $MODULES_JSON"
+          echo "modules_json=$MODULES_JSON" >> $GITHUB_OUTPUT
+
+      - id: construct-json-matrix-for-modules
+        run: |
+          IFS=',' read -ra MODULES <<< "${{ github.event.inputs.modules }}"
+          IFS=',' read -ra ENVIRONMENTS <<< "${{ github.event.inputs.environments }}"
+
+          MATRIX_JSON="{\"include\": ["
+          for ENV in "${ENVIRONMENTS[@]}"; do
+            for MODULE in "${MODULES[@]}"; do
+              # Set release names for modules
+              if [[ "$MODULE" == "api" ]]; then
+                RELEASE_NAME='googlecalendartoluma-api'
+              elif [[ "$MODULE" == "cronjob" ]]; then
+                RELEASE_NAME='googlecalendartoluma-cron'
+              else
+                RELEASE_NAME="$MODULE"
+              fi
+
+              MATRIX_JSON+="{\"environment\": \"$ENV\", \"module\": \"$MODULE\", \"module_lower\": \"$(echo $MODULE | tr '[:upper:]' '[:lower:]')\", \"releaseName\": \"$RELEASE_NAME\"},"
+            done
+          done
+          MATRIX_JSON="${MATRIX_JSON%,}]}"
+          echo "MATRIX_JSON=$MATRIX_JSON"
+          echo "matrix_json=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  Docker_Build:
+    name: Docker Build ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    needs: Prepare_Data
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.Prepare_Data.outputs.modules_json) }}
+    env:
+      IMAGE_NAME: ${{ matrix.module }}
+      IMAGE_NAME_LOWER: ${{ matrix.module_lower }}
+      IMAGE_TAG: ${{ github.run_id }}
+      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: env.IMAGE_REGISTRY == 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Add other registry logins here (Azure ACR, Docker Hub, etc.)
+      # - name: Log in to Azure Container Registry
+      #   if: env.IMAGE_REGISTRY != 'ghcr.io'
+      #   uses: azure/docker-login@v1
+      #   with:
+      #     login-server: ${{ env.IMAGE_REGISTRY }}
+      #     username: ${{ secrets.ACR_USERNAME }}
+      #     password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ env.IMAGE_NAME }}
+          file: ./${{ env.IMAGE_NAME }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_FULL }}
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME_LOWER }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RUN_UNIT_TESTS=${{ github.event.inputs.runUnitTests }}
+
+      - name: Extract test artifacts (if unit tests run)
+        if: github.event.inputs.runUnitTests == 'true'
+        run: |
+          # Extract test results if they exist
+          docker create --name test-container ${{ env.IMAGE_FULL }}
+          docker cp test-container:/app/test-results ./test-results || true
+          docker cp test-container:/app/coverage.xml ./coverage.xml || true
+          docker rm test-container
+        continue-on-error: true
+
+      - name: Upload test results
+        if: github.event.inputs.runUnitTests == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ env.IMAGE_NAME_LOWER }}
+          path: |
+            test-results/
+            coverage.xml
+          if-no-files-found: ignore
+
+      # Add SonarQube scan if needed
+      # - name: Sonar Scan
+      #   uses: sonarsource/sonarqube-scan-action@master
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #     SONAR_HOST_URL: https://sonar.example.com
+
+      # Add security scanning if needed
+      # - name: Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: ${{ env.IMAGE_FULL }}
+      #     format: 'sarif'
+      #     output: 'trivy-results.sarif'
+      #   continue-on-error: true
+
+  Deploy_To_Kubernetes:
+    name: Deploy ${{ matrix.module }} to ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    needs: [Prepare_Data, Docker_Build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.Prepare_Data.outputs.matrix_json) }}
+    env:
+      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.run_id }}
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Setup Kubernetes context
+        run: |
+          # Setup kubectl config
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig.yaml || echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          kubectl cluster-info || echo "Warning: Could not connect to cluster - verify KUBECONFIG secret"
+
+      - name: Install Helm
+        if: matrix.module == 'api'
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      # Deploy API module with Helm
+      - name: Deploy API with Helm
+        if: matrix.module == 'api'
+        run: |
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          
+          CHART_PATH="./api/helm/googlecalendartoluma"
+          RELEASE_NAME="${{ matrix.releaseName }}"
+          
+          # Verify chart exists
+          if [ ! -d "$CHART_PATH" ]; then
+            echo "Error: Chart path $CHART_PATH not found"
+            exit 1
+          fi
+          
+          # Determine values file based on environment
+          if [ "${{ matrix.environment }}" == "dev" ]; then
+            VALUES_FILE="$CHART_PATH/values-dev.yaml"
+          else
+            VALUES_FILE="$CHART_PATH/values.yaml"
+          fi
+          
+          # Build image repository path
+          IMAGE_REPO="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}"
+          IMAGE_TAG="${{ github.run_id }}"
+          
+          echo "Deploying $RELEASE_NAME to ${{ matrix.environment }}"
+          echo "Chart: $CHART_PATH"
+          echo "Values: $VALUES_FILE"
+          echo "Image: $IMAGE_REPO:$IMAGE_TAG"
+          
+          # Helm upgrade/install
+          helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace default \
+            --create-namespace \
+            --set image.repository="$IMAGE_REPO" \
+            --set image.tag="$IMAGE_TAG" \
+            --set image.pullPolicy=Always \
+            -f "$VALUES_FILE" \
+            --wait --timeout 300s
+          
+          # Verify deployment
+          kubectl get deployment "$RELEASE_NAME" -n default || echo "Warning: Deployment not found"
+          kubectl get svc "$RELEASE_NAME" -n default || echo "Warning: Service not found"
+
+      # Deploy CronJob module with kubectl
+      - name: Deploy CronJob with kubectl
+        if: matrix.module == 'cronjob'
+        run: |
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          
+          # Verify manifests exist
+          if [ ! -f "./cronjob/deployment/cronjob.yaml" ]; then
+            echo "Error: CronJob manifest not found"
+            exit 1
+          fi
+          
+          if [ ! -f "./cronjob/deployment/configmap.yaml" ]; then
+            echo "Error: ConfigMap manifest not found"
+            exit 1
+          fi
+          
+          # Create temporary manifest with updated image
+          cp ./cronjob/deployment/cronjob.yaml ./cronjob-deployment-temp.yaml
+          
+          # Update image in CronJob manifest (Linux sed syntax)
+          sed -i "s|image:.*|image: ${{ env.IMAGE_FULL }}|g" ./cronjob-deployment-temp.yaml
+          sed -i "s|imagePullPolicy:.*|imagePullPolicy: Always|g" ./cronjob-deployment-temp.yaml
+          
+          echo "Deploying CronJob to ${{ matrix.environment }}"
+          echo "Image: ${{ env.IMAGE_FULL }}"
+          
+          # Apply ConfigMap and CronJob
+          kubectl apply -f ./cronjob/deployment/configmap.yaml
+          kubectl apply -f ./cronjob/deployment/cronjob-deployment-temp.yaml
+          
+          # Verify CronJob is created
+          kubectl get cronjob "${{ matrix.releaseName }}" -n default || echo "Warning: CronJob not found"
+          
+          # Cleanup temp file
+          rm -f ./cronjob-deployment-temp.yaml
+
+      # Add Azure AKS deployment if needed
+      # - name: Azure Login
+      #   if: matrix.environment != 'local'
+      #   uses: azure/login@v2
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      #
+      # - name: Get AKS Credentials
+      #   if: matrix.environment != 'local'
+      #   uses: azure/aks-set-context@v4
+      #   with:
+      #     resource-group: ${{ secrets.AKS_RG }}
+      #     cluster-name: ${{ secrets.AKS_CLUSTER }}
+
+  Summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [Prepare_Data, Docker_Build, Deploy_To_Kubernetes]
+    if: always()
+    steps:
+      - name: Print deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Modules Built:** ${{ github.event.inputs.modules }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environments Deployed:** ${{ github.event.inputs.environments }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Registry:** ${{ env.IMAGE_REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Images Built:" >> $GITHUB_STEP_SUMMARY
+          echo "- ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/api:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/cronjob:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
