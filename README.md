@@ -471,3 +471,71 @@ curl 'https://api2.luma.com/event/create' \
   -b 'YOUR_FRESH_LUMA_COOKIES_HERE' \
   --data-binary '@luma_payloads/event_1.json'
 ```
+
+## Cleanup
+
+When you're done working with the application, you can clean up resources:
+
+### Stop and Remove Helm Deployment
+
+```bash
+# Uninstall the Helm release
+helm uninstall googlecalendartoluma
+
+# Verify it's removed
+helm list
+kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma
+```
+
+### Stop Podman Machine
+
+```powershell
+# Stop the Podman machine (frees up resources)
+podman machine stop
+
+# Optional: Remove the machine (if you want to completely remove it)
+# podman machine rm
+```
+
+### Stop Minikube
+
+```bash
+# Stop minikube (keeps the VM but stops it)
+minikube stop
+
+# Optional: Delete minikube cluster (removes everything)
+# minikube delete
+```
+
+### Clean Up Image Files (Optional)
+
+```powershell
+# Remove the saved image tar file
+Remove-Item googlecalendartoluma.tar -ErrorAction SilentlyContinue
+```
+
+### Complete Cleanup (All Resources)
+
+If you want to completely remove everything:
+
+```powershell
+# 1. Uninstall Helm release
+helm uninstall googlecalendartoluma
+
+# 2. Stop Podman machine
+podman machine stop
+
+# 3. Stop minikube
+minikube stop
+
+# 4. Optional: Delete minikube cluster (removes VM and all data)
+# minikube delete
+
+# 5. Clean up image files
+Remove-Item googlecalendartoluma.tar -ErrorAction SilentlyContinue
+```
+
+**Note:** 
+- `minikube stop` stops the VM but keeps all data - you can restart with `minikube start`
+- `minikube delete` completely removes the cluster and all data
+- `podman machine stop` stops the VM but keeps the machine - you can restart with `podman machine start`
