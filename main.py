@@ -34,6 +34,22 @@ OUT_DIR = os.getenv("OUT_DIR", "luma_payloads")
 DIVIDER = "=" * 60
 # ----------------------------
 
+def _slugify_filename(name: str) -> str:
+    name = (name or "").strip().lower()
+    if not name:
+        return "event"
+    chars = []
+    for ch in name:
+        if ch.isalnum():
+            chars.append(ch)
+        elif ch in (" ", "-", "_"):
+            chars.append("-")
+    slug = "".join(chars)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    slug = slug.strip("-")
+    return slug or "event"
+
 def embed_to_ics(embed_url: str):
     qs = parse_qs(urlparse(embed_url).query)
     src = qs.get("src", [None])[0]
@@ -226,7 +242,12 @@ def main():
             payload = build_payload(ev, tzname, LUMA_CALENDAR_API_ID)
 
             # Save to file
-            out_path = os.path.join(OUT_DIR, f"event_{idx}.json")
+            base_slug = _slugify_filename(ev["summary"])
+            filename = f"{base_slug}.json"
+            out_path = os.path.join(OUT_DIR, filename)
+            if os.path.exists(out_path):
+                filename = f"{base_slug}-{idx}.json"
+                out_path = os.path.join(OUT_DIR, filename)
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
             logger.info(f"Saved payload to {out_path}")
