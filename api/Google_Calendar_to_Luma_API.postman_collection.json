@@ -1,0 +1,259 @@
+{
+	"info": {
+		"_postman_id": "google-calendar-to-luma-api",
+		"name": "Google Calendar to Luma API",
+		"description": "Postman collection for the Google Calendar to Luma Sync API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health"
+					]
+				},
+				"description": "Health check endpoint to verify the API is running"
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"status\": \"healthy\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Get All Events",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/events",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"events"
+					]
+				},
+				"description": "Get all upcoming events from Google Calendar as Luma-compatible JSON payloads"
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"events"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"success\": true,\n    \"count\": 3,\n    \"events\": [\n        {\n            \"name\": \"Event Name\",\n            \"start_at\": \"2024-01-15T10:00:00.000Z\",\n            \"duration_interval\": \"PT2H\",\n            \"description\": \"Event description\",\n            \"calendar_api_id\": \"cal-iPlAn4RA1wD1lDh\",\n            \"cover_url\": \"https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60\",\n            \"tint_color\": \"#708967\",\n            \"font_title\": \"geist-mono\"\n        }\n    ],\n    \"timezone\": \"America/New_York\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Get Event by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/events/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"events",
+						"1"
+					],
+					"variable": [
+						{
+							"key": "event_id",
+							"value": "1",
+							"description": "Event ID (1-indexed)"
+						}
+					]
+				},
+				"description": "Get a specific event by ID (1-indexed). The ID corresponds to the position in the events array from GET /events"
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"events",
+								"1"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"success\": true,\n    \"event\": {\n        \"name\": \"Event Name\",\n        \"start_at\": \"2024-01-15T10:00:00.000Z\",\n        \"duration_interval\": \"PT2H\",\n        \"description\": \"Event description\",\n        \"calendar_api_id\": \"cal-iPlAn4RA1wD1lDh\",\n        \"cover_url\": \"https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60\",\n        \"tint_color\": \"#708967\",\n        \"font_title\": \"geist-mono\"\n    }\n}"
+				},
+				{
+					"name": "Not Found",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events/999",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"events",
+								"999"
+							]
+						}
+					},
+					"status": "Not Found",
+					"code": 404,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"success\": false,\n    \"error\": \"Event ID 999 not found. Available IDs: 1-3\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Get API Info",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					]
+				},
+				"description": "Get API information and available endpoints"
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"name\": \"Google Calendar to Luma Sync API\",\n    \"version\": \"1.0.0\",\n    \"endpoints\": {\n        \"health\": \"/health\",\n        \"events\": \"/events\",\n        \"event_by_id\": \"/events/<id>\"\n    }\n}"
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		}
+	]
+}
+

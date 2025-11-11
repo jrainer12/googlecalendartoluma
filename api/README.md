@@ -170,7 +170,9 @@ docker build -t googlecalendartoluma-api:latest .
 minikube image ls | grep googlecalendartoluma-api
 ```
 
-3. **Update configuration** in `helm/googlecalendartoluma/values.yaml`:
+3. **Update configuration** for your environment:
+
+**For Production/Default** - Edit `helm/googlecalendartoluma/values.yaml`:
 ```yaml
 config:
   gcalEmbedUrl: "your_google_calendar_embed_url"
@@ -179,34 +181,51 @@ config:
   limit: 5
 ```
 
+**For Development** - Edit `helm/googlecalendartoluma/values-dev.yaml`:
+```yaml
+config:
+  gcalEmbedUrl: "your_google_calendar_embed_url"
+  lumaCalendarApiId: "your_luma_calendar_api_id"
+  timezoneName: "America/New_York"
+  limit: 3
+```
+
 4. **Install with Helm**:
+
+**For Production/Default** (uses `values.yaml`):
 ```bash
 helm install googlecalendartoluma ./helm/googlecalendartoluma
 ```
 
+**For Development** (uses `values-dev.yaml`):
+```bash
+helm install googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml
+```
+
 5. **Wait for deployment** and check status:
 ```bash
-kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma
-kubectl get svc googlecalendartoluma
+kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma-api
+kubectl get svc googlecalendartoluma-api
 ```
 
 6. **Access the API**:
 
 **Option 1: Port forward (recommended for testing)**
 ```bash
-kubectl port-forward svc/googlecalendartoluma 8080:80
+kubectl port-forward svc/googlecalendartoluma-api 8080:80
 # Then access: http://localhost:8080
 ```
 
 **Option 2: Use minikube service (exposes to host)**
 ```bash
-minikube service googlecalendartoluma
+minikube service googlecalendartoluma-api
 # This will open the service URL in your browser
 ```
 
 **Option 3: Get the service URL**
 ```bash
-minikube service googlecalendartoluma --url
+minikube service googlecalendartoluma-api --url
 # Use the returned URL to access the API
 ```
 
@@ -253,6 +272,7 @@ curl http://localhost:8080/
 
 ## Updating Configuration
 
+**For Production/Default:**
 ```bash
 # Edit values.yaml, then upgrade
 helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
@@ -261,6 +281,18 @@ helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
 helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
   --set config.limit=10 \
   --set config.timezoneName="America/Los_Angeles"
+```
+
+**For Development:**
+```bash
+# Edit values-dev.yaml, then upgrade with dev values
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml
+
+# Or override values directly
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml \
+  --set config.limit=10
 ```
 
 ## Managing the Deployment
@@ -273,7 +305,7 @@ helm list
 helm status googlecalendartoluma
 
 # View logs
-kubectl logs -l app.kubernetes.io/name=googlecalendartoluma
+kubectl logs -l app.kubernetes.io/name=googlecalendartoluma-api
 
 # Uninstall
 helm uninstall googlecalendartoluma
@@ -281,8 +313,7 @@ helm uninstall googlecalendartoluma
 
 ## Enable/Disable Horizontal Pod Autoscaler (HPA)
 
-Edit `helm/googlecalendartoluma/values.yaml`:
-
+**For Production** - Edit `helm/googlecalendartoluma/values.yaml`:
 ```yaml
 autoscaling:
   enabled: true  # Set to true to enable HPA
@@ -297,24 +328,41 @@ Then upgrade:
 helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
 ```
 
+**For Development** - Edit `helm/googlecalendartoluma/values-dev.yaml` (autoscaling is disabled by default):
+```yaml
+autoscaling:
+  enabled: false  # Disabled in dev
+```
+
+Then upgrade:
+```bash
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml
+```
+
 **Or enable via command line:**
 ```bash
+# Production
 helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
   --set autoscaling.enabled=true \
   --set autoscaling.minReplicas=2 \
   --set autoscaling.maxReplicas=5
+
+# Development
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml \
+  --set autoscaling.enabled=true
 ```
 
 **Check HPA status:**
 ```bash
 kubectl get hpa
-kubectl describe hpa googlecalendartoluma
+kubectl describe hpa googlecalendartoluma-api
 ```
 
 ## Enable Ingress (for external access)
 
-Edit `helm/googlecalendartoluma/values.yaml`:
-
+**For Production** - Edit `helm/googlecalendartoluma/values.yaml`:
 ```yaml
 ingress:
   enabled: true
@@ -336,14 +384,51 @@ Then upgrade:
 helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
 ```
 
-## Development Values
+**For Development** - Edit `helm/googlecalendartoluma/values-dev.yaml`:
+```yaml
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: googlecalendartoluma-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+```
 
-Use `values-dev.yaml` for development-specific overrides:
-
+Then upgrade:
 ```bash
-helm install googlecalendartoluma ./helm/googlecalendartoluma \
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
   -f ./helm/googlecalendartoluma/values-dev.yaml
 ```
+
+## Environment-Specific Values
+
+The Helm chart supports environment-specific configuration:
+
+- **`values.yaml`** - Default/production values (used by default)
+- **`values-dev.yaml`** - Development environment overrides
+
+**Always specify the environment when installing or upgrading:**
+
+```bash
+# Production/Default (uses values.yaml)
+helm install googlecalendartoluma ./helm/googlecalendartoluma
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
+
+# Development (uses values-dev.yaml)
+helm install googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml
+helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+  -f ./helm/googlecalendartoluma/values-dev.yaml
+```
+
+**The `values-dev.yaml` file overrides:**
+- Image tag: `dev` (instead of `latest`)
+- Event limit: `3` (instead of `5`)
+- Autoscaling: `disabled` (instead of `enabled`)
+
+**Note:** `values-dev.yaml` only contains differences from `values.yaml`. Helm merges them, so you only need to specify what's different for your environment.
 
 ## For Production
 
@@ -363,6 +448,6 @@ helm uninstall googlecalendartoluma
 
 # Verify it's removed
 helm list
-kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma
+kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma-api
 ```
 

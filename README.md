@@ -150,11 +150,15 @@ podman build -t googlecalendartoluma-api:latest .
 podman save googlecalendartoluma-api:latest -o api.tar
 minikube image load api.tar
 
-# Deploy with Helm
+# Deploy with Helm (Production - uses values.yaml)
 helm install googlecalendartoluma ./helm/googlecalendartoluma
 
+# OR Deploy for Development (uses values-dev.yaml)
+# helm install googlecalendartoluma ./helm/googlecalendartoluma \
+#   -f ./helm/googlecalendartoluma/values-dev.yaml
+
 # Access via port-forward
-kubectl port-forward svc/googlecalendartoluma 8080:80
+kubectl port-forward svc/googlecalendartoluma-api 8080:80
 ```
 
 ### CronJob Module (Kubernetes)
@@ -228,7 +232,7 @@ minikube stop
 
 ```bash
 # API module
-helm uninstall googlecalendartoluma
+helm uninstall googlecalendartoluma  # Release name (can be anything)
 
 # CronJob module
 kubectl delete cronjob googlecalendartoluma-cron

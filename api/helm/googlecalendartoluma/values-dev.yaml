@@ -1,23 +1,13 @@
-replicaCount: 1
+# Development environment overrides
+# Use with: helm install googlecalendartoluma ./helm/googlecalendartoluma -f ./helm/googlecalendartoluma/values-dev.yaml
+
+fullnameOverride: "googlecalendartoluma-api"
 
 image:
-  repository: localhost/googlecalendartoluma-api
-  pullPolicy: Never
-  tag: "dev"
-
-service:
-  type: ClusterIP
-  port: 80
-  targetPort: 5000
+  tag: "latest"
 
 config:
-  gcalEmbedUrl: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
-  lumaCalendarApiId: "cal-iPlAn4RA1wD1lDh"
-  timezoneName: "America/New_York"
   limit: 3
-  coverUrl: "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
-  tintColor: "#708967"
-  fontTitle: "geist-mono"
 
 autoscaling:
   enabled: false
