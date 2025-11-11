@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "googlecalendartoluma-api.fullname" . }}
+  labels:
+    {{- include "googlecalendartoluma-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "googlecalendartoluma-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "googlecalendartoluma-api.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "googlecalendartoluma-api.fullname" . }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: GCAL_EMBED_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: GCAL_EMBED_URL
+            - name: LUMA_CALENDAR_API_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: LUMA_CALENDAR_API_ID
+            - name: TIMEZONE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: TIMEZONE_NAME
+            - name: LIMIT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: LIMIT
+            - name: COVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: COVER_URL
+            - name: TINT_COLOR
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: TINT_COLOR
+            - name: FONT_TITLE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
+                  key: FONT_TITLE
+            - name: OUT_DIR
+              value: "/app/luma_payloads"
+            - name: PORT
+              value: "{{ .Values.service.targetPort }}"
+            - name: HOST
+              value: "0.0.0.0"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

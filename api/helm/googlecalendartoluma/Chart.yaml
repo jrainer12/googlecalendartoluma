@@ -1,0 +1,7 @@
+apiVersion: v2
+name: googlecalendartoluma-api
+description: Helm chart for Google Calendar to Luma Sync API service
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+

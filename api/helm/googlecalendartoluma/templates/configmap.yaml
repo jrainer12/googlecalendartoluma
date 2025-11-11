@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "googlecalendartoluma.fullname" . }}-config
+  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
   labels:
-    {{- include "googlecalendartoluma.labels" . | nindent 4 }}
+    {{- include "googlecalendartoluma-api.labels" . | nindent 4 }}
 data:
   GCAL_EMBED_URL: {{ .Values.config.gcalEmbedUrl | quote }}
   LUMA_CALENDAR_API_ID: {{ .Values.config.lumaCalendarApiId | quote }}

@@ -1,6 +1,29 @@
 # Google Calendar to Luma Sync
 
-Syncs upcoming events from a Google Calendar to Luma event payloads.
+Syncs upcoming events from a Google Calendar to Luma event payloads. This project consists of two independent modules: an **API microservice** and a **CronJob script**.
+
+## Project Structure
+
+```
+googlecalendartoluma/
+├── api/                    # REST API microservice
+│   ├── api.py             # Flask API application
+│   ├── Dockerfile         # Container image for API
+│   ├── docker-compose.yml # Local API deployment
+│   ├── requirements.txt   # Python dependencies
+│   ├── helm/              # Kubernetes Helm chart
+│   └── README.md          # API module documentation
+│
+├── cronjob/               # Scheduled job script
+│   ├── main.py           # Main script
+│   ├── Dockerfile        # Container image for cronjob
+│   ├── docker-compose.yml # Local cronjob deployment
+│   ├── requirements.txt  # Python dependencies
+│   ├── deployment/       # Kubernetes CronJob manifests
+│   └── README.md         # CronJob module documentation
+│
+└── README.md             # This file (overview)
+```
 
 ## Features
 
@@ -8,8 +31,9 @@ Syncs upcoming events from a Google Calendar to Luma event payloads.
 - Converts events to Luma-compatible JSON payloads
 - Configurable via environment variables
 - Dockerized for easy deployment
-- Kubernetes-ready (Job and CronJob manifests included)
-- Can be scheduled to run automatically
+- Kubernetes-ready (Helm chart for API, CronJob for scheduled tasks)
+- REST API for on-demand event fetching
+- Scheduled execution support
 
 ## Prerequisites
 
@@ -23,7 +47,7 @@ Choose one deployment method:
 
 ## Configuration
 
-The application can be configured using environment variables:
+Both modules use the same environment variables:
 
 - `GCAL_EMBED_URL` - Google Calendar embed URL (required)
 - `LUMA_CALENDAR_API_ID` - Luma calendar API ID (required)
@@ -34,370 +58,129 @@ The application can be configured using environment variables:
 - `LIMIT` - Maximum number of events to process (default: 5)
 - `OUT_DIR` - Output directory for JSON files (default: luma_payloads)
 
-## Container Deployment
+## Module Overview
 
-You can use either **Podman** (free, recommended) or **Docker**. Both work with the same files!
+### 📡 API Module
 
-### Using Podman (Free Alternative)
+**TLDR:** REST API microservice that exposes Google Calendar events as Luma payloads via HTTP endpoints.
 
-Podman is a free, open-source alternative to Docker that doesn't require a daemon. It's fully compatible with Docker images and docker-compose files.
+- **Use case:** On-demand event fetching via API calls
+- **Deployment:** Docker/Podman or Kubernetes with Helm
+- **Features:** Health checks, HPA support, Ingress support
+- **Quick start:**
+  ```bash
+  cd api
+  podman-compose up
+  # Access at http://localhost:5000
+  ```
 
-**Installation Steps:**
+📖 **Full documentation:** See [api/README.md](api/README.md)
 
-1. **Install Podman first** (required - `podman-compose` needs the Podman binary):
-   - **Windows** (Recommended: Podman Desktop):
-     - Download and install [Podman Desktop](https://podman-desktop.io/) - this handles VM setup automatically
-     - OR install Podman CLI and manually set up the VM (see "Complete Podman Setup for Windows" below)
-   - **Mac**: `brew install podman` then run `podman machine init` and `podman machine start`
-   - **Linux**: `sudo apt install podman` (Ubuntu/Debian) or `sudo dnf install podman` (Fedora/RHEL)
+### ⏰ CronJob Module
 
-2. **Install podman-compose** (Python wrapper - install after Podman):
-```bash
-pip install podman-compose
-```
+**TLDR:** Standalone script that generates Luma payloads and saves them to files. Designed for scheduled execution.
 
-### Complete Podman Setup for Windows (CLI)
+- **Use case:** Scheduled/automated event sync (e.g., daily at 2 AM)
+- **Deployment:** Docker/Podman or Kubernetes CronJob
+- **Features:** File-based output, event-name-based filenames
+- **Quick start:**
+  ```bash
+  cd cronjob
+  podman-compose up
+  # Output files in luma_payloads/
+  ```
 
-If you're using Podman CLI on Windows, follow these steps in order:
+📖 **Full documentation:** See [cronjob/README.md](cronjob/README.md)
 
-**Step 1: Enable WSL (Windows Subsystem for Linux)**
-```powershell
-# Run PowerShell as Administrator, then:
-wsl --install
-# Or if WSL is already installed, enable Virtual Machine Platform:
-dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-# Restart your computer after running these commands
-```
+## Podman Setup (Windows)
 
-**Step 2: Initialize Podman Machine** (first time only)
-```powershell
-podman machine init
-```
+Podman is a free, open-source alternative to Docker. For detailed setup instructions, see the troubleshooting section below.
 
-**Step 3: Start Podman Machine**
-```powershell
-podman machine start
-```
+**Quick Setup:**
 
-**Step 4: Verify Podman is Working**
-```powershell
-podman ps
-# Should return an empty list (no error means it's working)
-```
+1. **Install Podman Desktop** (recommended) - handles everything automatically
+   - Download from [podman-desktop.io](https://podman-desktop.io/)
 
-**Step 5: Check Machine Status**
-```powershell
-podman machine list
-```
+2. **OR Install Podman CLI manually:**
+   ```powershell
+   # Enable WSL (run PowerShell as Administrator)
+   wsl --install
+   # Restart computer, then:
+   podman machine init
+   podman machine start
+   ```
+
+3. **Install podman-compose:**
+   ```bash
+   pip install podman-compose
+   ```
 
 **Common Podman Commands:**
+- Start machine: `podman machine start`
+- Stop machine: `podman machine stop`
+- View containers: `podman ps`
 
-- **Start machine**: `podman machine start`
-- **Stop machine**: `podman machine stop`
-- **Restart machine**: `podman machine stop` then `podman machine start`
-- **List machines**: `podman machine list`
-- **Remove machine**: `podman machine rm` (removes the default machine)
-- **Check Podman version**: `podman --version`
-- **View running containers**: `podman ps`
-- **View all containers**: `podman ps -a`
+## Quick Start Examples
 
-**Using Podman Compose:**
+### API Module (Local)
 
-1. Create a `.env` file with your configuration (same as Docker):
 ```bash
-GCAL_EMBED_URL=https://calendar.google.com/calendar/embed?src=YOUR_CALENDAR_ID%40group.calendar.google.com&ctz=America%2FNew_York
-LUMA_CALENDAR_API_ID=cal-YOUR_CALENDAR_API_ID
-TIMEZONE_NAME=America/New_York
-LIMIT=5
-```
-
-2. Run with Podman Compose:
-```bash
+cd api
 podman-compose up
+# API available at http://localhost:5000
+curl http://localhost:5000/health
+curl http://localhost:5000/events
 ```
 
-**Using Podman directly:**
+### CronJob Module (Local)
 
-1. Build the image:
 ```bash
-podman build -t googlecalendartoluma .
+cd cronjob
+podman-compose up
+# Check output files
+ls luma_payloads/
 ```
 
-2. Run the container:
+### API Module (Kubernetes)
+
 ```bash
-podman run --rm \
-  -v $(pwd)/luma_payloads:/app/luma_payloads \
-  -e GCAL_EMBED_URL="your_embed_url" \
-  -e LUMA_CALENDAR_API_ID="your_api_id" \
-  googlecalendartoluma
-```
+cd api
+# Build and load image
+podman build -t googlecalendartoluma-api:latest .
+podman save googlecalendartoluma-api:latest -o api.tar
+minikube image load api.tar
 
-### Using Docker Compose (Recommended)
-
-1. Create a `.env` file with your configuration:
-```bash
-GCAL_EMBED_URL=https://calendar.google.com/calendar/embed?src=YOUR_CALENDAR_ID%40group.calendar.google.com&ctz=America%2FNew_York
-LUMA_CALENDAR_API_ID=cal-YOUR_CALENDAR_API_ID
-TIMEZONE_NAME=America/New_York
-LIMIT=5
-```
-
-2. Run with Docker Compose:
-```bash
-docker-compose up
-```
-
-3. Generated JSON files will be saved in the `luma_payloads/` directory on your host machine.
-
-### Using Docker directly
-
-1. Build the image:
-```bash
-docker build -t googlecalendartoluma .
-```
-
-2. Run the container:
-```bash
-docker run --rm \
-  -v $(pwd)/luma_payloads:/app/luma_payloads \
-  -e GCAL_EMBED_URL="your_embed_url" \
-  -e LUMA_CALENDAR_API_ID="your_api_id" \
-  googlecalendartoluma
-```
-
-**Note:** On Windows, replace `$(pwd)` with `%cd%` in PowerShell or use the full path.
-
-### Kubernetes Deployment with Helm (Minikube)
-
-Deploy the API service to Kubernetes using Helm. The service exposes a REST API to fetch Google Calendar events as Luma payloads.
-
-**Prerequisites:**
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/) installed and running
-- [Helm](https://helm.sh/docs/intro/install/) installed (v3.x)
-- `kubectl` configured to use minikube
-
-**Setup Steps:**
-
-1. **Start minikube** (if not already running):
-```bash
-minikube start
-```
-
-2. **Build the image and load it into minikube**:
-
-**Using Podman:**
-```bash
-# Build the API image with Podman
-podman build -f Dockerfile.api -t googlecalendartoluma:latest .
-
-# Save the image to a tar file
-podman save googlecalendartoluma:latest -o googlecalendartoluma.tar
-
-# Load the image into minikube
-minikube image load googlecalendartoluma.tar
-
-# Optional: Verify image is available
-minikube image ls | grep googlecalendartoluma
-```
-
-**Alternative: Using Docker (if you have Docker available):**
-```bash
-# Set Docker environment to use minikube's Docker daemon
-eval $(minikube docker-env)
-
-# Build the API image
-docker build -f Dockerfile.api -t googlecalendartoluma:latest .
-
-# Optional: Verify image is available
-minikube image ls | grep googlecalendartoluma
-```
-
-3. **Update configuration** in `helm/googlecalendartoluma/values.yaml`:
-```yaml
-config:
-  gcalEmbedUrl: "your_google_calendar_embed_url"
-  lumaCalendarApiId: "your_luma_calendar_api_id"
-  timezoneName: "America/New_York"
-  limit: 5
-```
-
-4. **Install with Helm**:
-```bash
+# Deploy with Helm
 helm install googlecalendartoluma ./helm/googlecalendartoluma
-```
 
-5. **Wait for deployment** and check status:
-```bash
-kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma
-kubectl get svc googlecalendartoluma
-```
-
-6. **Access the API**:
-
-**Option 1: Port forward (recommended for testing)**
-```bash
+# Access via port-forward
 kubectl port-forward svc/googlecalendartoluma 8080:80
-# Then access: http://localhost:8080
 ```
 
-**Option 2: Use minikube service (exposes to host)**
-```bash
-minikube service googlecalendartoluma
-# This will open the service URL in your browser
-```
-
-**Option 3: Get the service URL**
-```bash
-minikube service googlecalendartoluma --url
-# Use the returned URL to access the API
-```
-
-**API Endpoints:**
-
-- `GET /` - API information
-- `GET /health` - Health check endpoint
-- `GET /events` - Get all upcoming events as Luma payloads
-- `GET /events/<id>` - Get a specific event by ID (1-indexed)
-
-**Example API Calls:**
+### CronJob Module (Kubernetes)
 
 ```bash
-# Health check
-curl http://localhost:8080/health
+cd cronjob
+# Build and load image
+podman build -t googlecalendartoluma-cron:latest .
+podman save googlecalendartoluma-cron:latest -o cron.tar
+minikube image load cron.tar
 
-# Get all events
-curl http://localhost:8080/events
-
-# Get specific event (ID 1)
-curl http://localhost:8080/events/1
-
-# Get API info
-curl http://localhost:8080/
+# Deploy CronJob
+kubectl apply -f deployment/configmap.yaml
+kubectl apply -f deployment/cronjob.yaml
 ```
 
-**Response Format:**
-
-```json
-{
-  "success": true,
-  "count": 3,
-  "events": [
-    {
-      "name": "Event Name",
-      "start_at": "2024-01-15T10:00:00.000Z",
-      "duration_interval": "PT2H",
-      ...
-    }
-  ],
-  "timezone": "America/New_York"
-}
-```
-
-**Updating Configuration:**
-
-```bash
-# Edit values.yaml, then upgrade
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
-
-# Or override values directly
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  --set config.limit=10 \
-  --set config.timezoneName="America/Los_Angeles"
-```
-
-**Managing the Deployment:**
-
-```bash
-# View Helm releases
-helm list
-
-# View deployment status
-helm status googlecalendartoluma
-
-# View logs
-kubectl logs -l app.kubernetes.io/name=googlecalendartoluma
-
-# Uninstall
-helm uninstall googlecalendartoluma
-```
-
-**Enable/Disable Horizontal Pod Autoscaler (HPA):**
-
-Edit `helm/googlecalendartoluma/values.yaml`:
-
-```yaml
-autoscaling:
-  enabled: true  # Set to true to enable HPA
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
-```
-
-Then upgrade:
-```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
-```
-
-**Or enable via command line:**
-```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  --set autoscaling.enabled=true \
-  --set autoscaling.minReplicas=2 \
-  --set autoscaling.maxReplicas=5
-```
-
-**Check HPA status:**
-```bash
-kubectl get hpa
-kubectl describe hpa googlecalendartoluma
-```
-
-**Enable Ingress (for external access):**
-
-Edit `helm/googlecalendartoluma/values.yaml`:
-
-```yaml
-ingress:
-  enabled: true
-  className: "nginx"  # or your ingress controller class
-  hosts:
-    - host: googlecalendartoluma.yourdomain.com
-      paths:
-        - path: /
-          pathType: Prefix
-  # Optional: TLS configuration
-  # tls:
-  #   - secretName: googlecalendartoluma-tls
-  #     hosts:
-  #       - googlecalendartoluma.yourdomain.com
-```
-
-Then upgrade:
-```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
-```
-
-**For Production:**
-
-- Push the image to a container registry
-- Update `values.yaml` to use the registry image
-- Change `image.pullPolicy` to `Always` or `IfNotPresent`
-- Consider using Secrets for sensitive configuration
-- Enable Ingress for external access (see above)
-
-### Troubleshooting Podman on Windows
+## Troubleshooting Podman on Windows
 
 **Error: "Cannot connect to Podman" or "unable to connect to Podman socket"**
 
-1. **If using Podman Desktop**: Make sure Podman Desktop is running and the VM is started (check the Desktop app)
-
-2. **If using Podman CLI**: See "Complete Podman Setup for Windows (CLI)" section above for full setup instructions.
+1. **If using Podman Desktop:** Make sure Podman Desktop is running and the VM is started
+2. **If using Podman CLI:** Run `podman machine start`
 
 **Error: "HCS_E_SERVICE_NOT_AVAILABLE" or "required feature is not installed"**
 
-This means WSL (Windows Subsystem for Linux) or Virtual Machine Platform is not enabled. Fix it with:
+WSL (Windows Subsystem for Linux) or Virtual Machine Platform is not enabled. Fix it:
 
 ```powershell
 # Run PowerShell as Administrator
@@ -423,43 +206,38 @@ podman ps
 # Should return an empty list (no error means it's working)
 ```
 
-**Quick Reference - Managing the Podman Machine:**
+## Cleanup
 
-- **Start machine**: `podman machine start`
-- **Stop machine**: `podman machine stop` (use this when done to free up resources)
-- **Check status**: `podman machine list`
-- **View containers**: `podman ps` (running) or `podman ps -a` (all)
+When you're done working with the application:
 
-## Local Development
+### Stop Podman Machine
 
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
+```powershell
+podman machine stop
 ```
 
-2. Set environment variables (optional, defaults are provided):
+### Stop Minikube
+
 ```bash
-export GCAL_EMBED_URL="your_embed_url"
-export LUMA_CALENDAR_API_ID="your_api_id"
+minikube stop
+# Optional: Delete cluster
+# minikube delete
 ```
 
-3. Run the script:
+### Remove Helm Deployments
+
 ```bash
-python main.py
+# API module
+helm uninstall googlecalendartoluma
+
+# CronJob module
+kubectl delete cronjob googlecalendartoluma-cron
+kubectl delete configmap googlecalendartoluma-cron-config
 ```
-
-## Output
-
-The script generates JSON files in the `luma_payloads/` directory, one per event:
-- `event_1.json`
-- `event_2.json`
-- etc.
-
-Each file contains a Luma-compatible event payload that can be sent to the Luma API.
 
 ## Usage with Luma API
 
-After generating the payloads, you can send them to Luma using curl:
+After generating payloads (via API or CronJob), send them to Luma:
 
 ```bash
 curl 'https://api2.luma.com/event/create' \
@@ -469,73 +247,12 @@ curl 'https://api2.luma.com/event/create' \
   -H 'referer: https://luma.com/' \
   -H 'x-luma-client-type: luma-web' \
   -b 'YOUR_FRESH_LUMA_COOKIES_HERE' \
-  --data-binary '@luma_payloads/event_1.json'
+  --data-binary '@luma_payloads/event-name.json'
 ```
 
-## Cleanup
+## Module Documentation
 
-When you're done working with the application, you can clean up resources:
+For detailed instructions on each module:
 
-### Stop and Remove Helm Deployment
-
-```bash
-# Uninstall the Helm release
-helm uninstall googlecalendartoluma
-
-# Verify it's removed
-helm list
-kubectl get pods -l app.kubernetes.io/name=googlecalendartoluma
-```
-
-### Stop Podman Machine
-
-```powershell
-# Stop the Podman machine (frees up resources)
-podman machine stop
-
-# Optional: Remove the machine (if you want to completely remove it)
-# podman machine rm
-```
-
-### Stop Minikube
-
-```bash
-# Stop minikube (keeps the VM but stops it)
-minikube stop
-
-# Optional: Delete minikube cluster (removes everything)
-# minikube delete
-```
-
-### Clean Up Image Files (Optional)
-
-```powershell
-# Remove the saved image tar file
-Remove-Item googlecalendartoluma.tar -ErrorAction SilentlyContinue
-```
-
-### Complete Cleanup (All Resources)
-
-If you want to completely remove everything:
-
-```powershell
-# 1. Uninstall Helm release
-helm uninstall googlecalendartoluma
-
-# 2. Stop Podman machine
-podman machine stop
-
-# 3. Stop minikube
-minikube stop
-
-# 4. Optional: Delete minikube cluster (removes VM and all data)
-# minikube delete
-
-# 5. Clean up image files
-Remove-Item googlecalendartoluma.tar -ErrorAction SilentlyContinue
-```
-
-**Note:** 
-- `minikube stop` stops the VM but keeps all data - you can restart with `minikube start`
-- `minikube delete` completely removes the cluster and all data
-- `podman machine stop` stops the VM but keeps the machine - you can restart with `podman machine start`
+- **API Module:** [api/README.md](api/README.md) - REST API deployment, Helm chart, endpoints
+- **CronJob Module:** [cronjob/README.md](cronjob/README.md) - Scheduled jobs, Kubernetes CronJob

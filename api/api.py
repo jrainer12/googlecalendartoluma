@@ -4,7 +4,7 @@ import os, json, requests, pytz, sys, logging
 from urllib.parse import urlparse, parse_qs, unquote
 from datetime import datetime, timezone, timedelta
 from icalendar import Calendar
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_cors import CORS
 
 # Configure logging
@@ -26,18 +26,19 @@ GCAL_EMBED_URL = os.getenv(
 LUMA_CALENDAR_API_ID = os.getenv("LUMA_CALENDAR_API_ID", "cal-iPlAn4RA1wD1lDh")
 
 # Match your latest example exactly (change if you like)
-COVER_URL   = os.getenv(
+COVER_URL = os.getenv(
     "COVER_URL",
     "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
 )
-TINT_COLOR  = os.getenv("TINT_COLOR", "#708967")
-FONT_TITLE  = os.getenv("FONT_TITLE", "geist-mono")
+TINT_COLOR = os.getenv("TINT_COLOR", "#708967")
+FONT_TITLE = os.getenv("FONT_TITLE", "geist-mono")
 
 TIMEZONE_NAME = os.getenv("TIMEZONE_NAME", "America/New_York")
 LIMIT = int(os.getenv("LIMIT", "5"))
 OUT_DIR = os.getenv("OUT_DIR", "luma_payloads")
 DIVIDER = "=" * 60
 # ----------------------------
+
 
 def _slugify_filename(name: str) -> str:
     name = (name or "").strip().lower()
@@ -55,6 +56,7 @@ def _slugify_filename(name: str) -> str:
     slug = slug.strip("-")
     return slug or "event"
 
+
 def embed_to_ics(embed_url: str):
     qs = parse_qs(urlparse(embed_url).query)
     src = qs.get("src", [None])[0]
@@ -64,6 +66,7 @@ def embed_to_ics(embed_url: str):
     cal_id = unquote(src)
     ics_url = f"https://calendar.google.com/calendar/ical/{cal_id}/public/full.ics"
     return ics_url, ctz
+
 
 def load_ics(ics_url: str) -> Calendar:
     logger.info(f"Fetching ICS from: {ics_url}")
@@ -75,6 +78,7 @@ def load_ics(ics_url: str) -> Calendar:
     except requests.RequestException as e:
         logger.error(f"Failed to fetch ICS calendar: {e}")
         raise
+
 
 def _to_dt(v):
     if hasattr(v, "dt"):
@@ -88,10 +92,12 @@ def _to_dt(v):
     dt = datetime(v.year, v.month, v.day, 0, 0, tzinfo=timezone.utc)
     return dt, is_all_day
 
+
 def iso8601_z_with_ms(dt_utc: datetime) -> str:
     base = dt_utc.replace(microsecond=0).isoformat()
     base = base.replace("+00:00", "")
     return f"{base}.000Z"
+
 
 def duration_from_range(start: datetime, end: datetime) -> str:
     seconds = int((end - start).total_seconds())
@@ -101,10 +107,14 @@ def duration_from_range(start: datetime, end: datetime) -> str:
     m = (seconds % 3600) // 60
     s = seconds % 60
     out = "PT"
-    if h: out += f"{h}H"
-    if m: out += f"{m}M"
-    if s or (not h and not m): out += f"{s}S"
+    if h:
+        out += f"{h}H"
+    if m:
+        out += f"{m}M"
+    if s or (not h and not m):
+        out += f"{s}S"
     return out
+
 
 def next_upcoming_events(cal: Calendar, tzname: str, limit=5):
     local_tz = pytz.timezone(tzname)
@@ -122,7 +132,6 @@ def next_upcoming_events(cal: Calendar, tzname: str, limit=5):
             end_utc, _ = _to_dt(dtend_raw)
         else:
             end_utc = start_utc + (timedelta(days=1) if all_day else timedelta(hours=1))
-        # future filter in local tz
         if start_utc.astimezone(local_tz) < now_local:
             continue
         upcoming.append({
@@ -135,8 +144,10 @@ def next_upcoming_events(cal: Calendar, tzname: str, limit=5):
     upcoming.sort(key=lambda x: x["start_utc"])
     return upcoming[:limit]
 
+
 def make_pm_paragraph(text: str):
     return {"type": "paragraph", "content": [{"type": "text", "text": text}]}
+
 
 def to_prosemirror_doc(desc_text: str, location_text: str):
     content = []
@@ -154,6 +165,7 @@ def to_prosemirror_doc(desc_text: str, location_text: str):
         return None
     return {"type": "doc", "content": content}
 
+
 def build_geo_address(location_text: str):
     if not location_text:
         return None
@@ -170,6 +182,7 @@ def build_geo_address(location_text: str):
         "country_code": None,
         "region": None
     }
+
 
 def build_payload(ev, tzname, calendar_api_id):
     pm_doc = to_prosemirror_doc(ev["description"], ev["location"])
@@ -214,12 +227,13 @@ def build_payload(ev, tzname, calendar_api_id):
     }
     return payload
 
+
 def fetch_events():
     """Fetch and process events from Google Calendar"""
     try:
         logger.info("Fetching Google Calendar events")
         os.makedirs(OUT_DIR, exist_ok=True)
-        
+
         ics_url, tzname = embed_to_ics(GCAL_EMBED_URL)
         cal = load_ics(ics_url)
         events = next_upcoming_events(cal, tzname, limit=LIMIT)
@@ -230,8 +244,7 @@ def fetch_events():
             logger.info(f"Processing event {idx}: {ev['summary']}")
             payload = build_payload(ev, tzname, LUMA_CALENDAR_API_ID)
             payloads.append(payload)
-            
-            # Save to file
+
             base_slug = _slugify_filename(ev["summary"])
             filename = f"{base_slug}.json"
             out_path = os.path.join(OUT_DIR, filename)
@@ -255,41 +268,38 @@ def fetch_events():
             "error": str(e)
         }
 
-@app.route('/health', methods=['GET'])
+
+@app.route("/health", methods=["GET"])
 def health():
-    """Health check endpoint"""
     return jsonify({"status": "healthy"}), 200
 
-@app.route('/events', methods=['GET'])
-def get_events():
-    """Get all upcoming events as Luma payloads"""
-    result = fetch_events()
-    if result["success"]:
-        return jsonify(result), 200
-    else:
-        return jsonify(result), 500
 
-@app.route('/events/<int:event_id>', methods=['GET'])
+@app.route("/events", methods=["GET"])
+def get_events():
+    result = fetch_events()
+    return jsonify(result), 200 if result["success"] else 500
+
+
+@app.route("/events/<int:event_id>", methods=["GET"])
 def get_event(event_id):
-    """Get a specific event by ID (1-indexed)"""
     result = fetch_events()
     if not result["success"]:
         return jsonify(result), 500
-    
+
     if event_id < 1 or event_id > result["count"]:
         return jsonify({
             "success": False,
             "error": f"Event ID {event_id} not found. Available IDs: 1-{result['count']}"
         }), 404
-    
+
     return jsonify({
         "success": True,
         "event": result["events"][event_id - 1]
     }), 200
 
-@app.route('/', methods=['GET'])
+
+@app.route("/", methods=["GET"])
 def root():
-    """API information"""
     return jsonify({
         "service": "Google Calendar to Luma Sync API",
         "version": "1.0.0",
@@ -299,6 +309,7 @@ def root():
             "/events/<id>": "Get specific event by ID (1-indexed)"
         }
     }), 200
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
