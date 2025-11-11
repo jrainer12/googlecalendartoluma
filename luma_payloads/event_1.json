@@ -1,0 +1,73 @@
+{
+  "name": "Club Meeting - Maddie Briscoe Sustainable Initiatives at Georgia State University",
+  "start_at": "2025-11-11T23:30:00.000Z",
+  "duration_interval": "PT1H30M",
+  "zoom_meeting_url": null,
+  "zoom_meeting_id": null,
+  "zoom_meeting_password": null,
+  "description_mirror": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Maddie earned her bachelor’s degree in Journalism from Georgia State University in May 2025. She joined the sustainability team as a social media and marketing intern in January 2024 before transitioning to our engagement coordinator after her graduation. <br><br><a href=\"https://sustainability.gsu.edu/profile/maddie-briscoe/\">https://sustainability.gsu.edu/profile/maddie-briscoe/</a>"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Location: Holiday Inn Express & Suites Atlanta N-Perimeter Mall Area, an IHG Hotel, 765 Hammond Dr, Sandy Springs, GA 30328, USA"
+          }
+        ]
+      }
+    ]
+  },
+  "geo_address_visibility": "public",
+  "cover_url": "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60",
+  "zoom_session_type": null,
+  "zoom_creation_method": null,
+  "location_type": "offline",
+  "geo_address_json": {
+    "description": "",
+    "full_address": "Holiday Inn Express & Suites Atlanta N-Perimeter Mall Area, an IHG Hotel, 765 Hammond Dr, Sandy Springs, GA 30328, USA",
+    "city_state": null,
+    "type": "text",
+    "address": "Holiday Inn Express & Suites Atlanta N-Perimeter Mall Area, an IHG Hotel, 765 Hammond Dr, Sandy Springs, GA 30328, USA",
+    "place_id": null,
+    "city": null,
+    "country": null,
+    "country_code": null,
+    "region": null
+  },
+  "coordinate": null,
+  "timezone": "America/New_York",
+  "calendar_api_id": "cal-iPlAn4RA1wD1lDh",
+  "calendar_to_submit_to_api_id": null,
+  "supports_members_only": false,
+  "max_capacity": null,
+  "waitlist_enabled": false,
+  "visibility": "public",
+  "theme_meta": {
+    "theme": "legacy"
+  },
+  "tint_color": "#708967",
+  "font_title": "geist-mono",
+  "ticket_types": [
+    {
+      "type": "free",
+      "ethereum_token_requirements": [],
+      "cents": null,
+      "is_flexible": false,
+      "min_cents": null,
+      "require_approval": false,
+      "currency": null,
+      "is_hidden": false
+    }
+  ]
+}

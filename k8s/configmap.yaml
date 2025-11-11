@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: googlecalendartoluma-config
+data:
+  GCAL_EMBED_URL: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
+  LUMA_CALENDAR_API_ID: "cal-iPlAn4RA1wD1lDh"
+  TIMEZONE_NAME: "America/New_York"
+  LIMIT: "5"
+  COVER_URL: "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
+  TINT_COLOR: "#708967"
+  FONT_TITLE: "geist-mono"
+

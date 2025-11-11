@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "googlecalendartoluma.fullname" . }}-config
+  labels:
+    {{- include "googlecalendartoluma.labels" . | nindent 4 }}
+data:
+  GCAL_EMBED_URL: {{ .Values.config.gcalEmbedUrl | quote }}
+  LUMA_CALENDAR_API_ID: {{ .Values.config.lumaCalendarApiId | quote }}
+  TIMEZONE_NAME: {{ .Values.config.timezoneName | quote }}
+  LIMIT: {{ .Values.config.limit | quote }}
+  COVER_URL: {{ .Values.config.coverUrl | quote }}
+  TINT_COLOR: {{ .Values.config.tintColor | quote }}
+  FONT_TITLE: {{ .Values.config.fontTitle | quote }}
+

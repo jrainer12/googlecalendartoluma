@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: googlecalendartoluma
+  labels:
+    app: googlecalendartoluma
+spec:
+  ttlSecondsAfterFinished: 3600  # Clean up job after 1 hour
+  template:
+    metadata:
+      labels:
+        app: googlecalendartoluma
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: googlecalendartoluma
+        image: googlecalendartoluma:latest
+        imagePullPolicy: Never  # Use local image in minikube
+        env:
+        - name: GCAL_EMBED_URL
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: GCAL_EMBED_URL
+        - name: LUMA_CALENDAR_API_ID
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: LUMA_CALENDAR_API_ID
+        - name: TIMEZONE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: TIMEZONE_NAME
+              optional: true
+        - name: LIMIT
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: LIMIT
+              optional: true
+        - name: COVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: COVER_URL
+              optional: true
+        - name: TINT_COLOR
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: TINT_COLOR
+              optional: true
+        - name: FONT_TITLE
+          valueFrom:
+            configMapKeyRef:
+              name: googlecalendartoluma-config
+              key: FONT_TITLE
+              optional: true
+        - name: OUT_DIR
+          value: "/output"
+        volumeMounts:
+        - name: output-volume
+          mountPath: /app/luma_payloads
+      volumes:
+      - name: output-volume
+        hostPath:
+          path: /tmp/luma_payloads  # Accessible from minikube host
+          type: DirectoryOrCreate
+
