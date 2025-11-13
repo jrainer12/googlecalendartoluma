@@ -1,0 +1,14 @@
+# Development environment overrides
+# Use with: helm install googlecalendartoluma ./helm/googlecalendartoluma -f ./helm/googlecalendartoluma/values-dev.yaml
+
+fullnameOverride: "googlecalendartoluma-api"
+
+image:
+  tag: "latest"
+
+config:
+  limit: 3
+
+autoscaling:
+  enabled: false
+

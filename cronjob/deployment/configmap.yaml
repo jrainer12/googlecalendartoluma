@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: googlecalendartoluma-config
+  name: googlecalendartoluma-cron-config
 data:
   GCAL_EMBED_URL: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
   LUMA_CALENDAR_API_ID: "cal-iPlAn4RA1wD1lDh"

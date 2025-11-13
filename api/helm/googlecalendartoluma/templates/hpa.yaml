@@ -2,14 +2,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "googlecalendartoluma.fullname" . }}
+  name: {{ include "googlecalendartoluma-api.fullname" . }}
   labels:
-    {{- include "googlecalendartoluma.labels" . | nindent 4 }}
+    {{- include "googlecalendartoluma-api.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "googlecalendartoluma.fullname" . }}
+    name: {{ include "googlecalendartoluma-api.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

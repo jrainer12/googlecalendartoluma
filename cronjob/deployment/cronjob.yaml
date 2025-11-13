@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: googlecalendartoluma-cron
+  labels:
+    app: googlecalendartoluma-cron
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app: googlecalendartoluma-cron
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: googlecalendartoluma-cron
+              image: googlecalendartoluma-cron:latest
+              imagePullPolicy: Never
+              env:
+                - name: GCAL_EMBED_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: GCAL_EMBED_URL
+                - name: LUMA_CALENDAR_API_ID
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: LUMA_CALENDAR_API_ID
+                - name: TIMEZONE_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: TIMEZONE_NAME
+                      optional: true
+                - name: LIMIT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: LIMIT
+                      optional: true
+                - name: COVER_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: COVER_URL
+                      optional: true
+                - name: TINT_COLOR
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: TINT_COLOR
+                      optional: true
+                - name: FONT_TITLE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: googlecalendartoluma-cron-config
+                      key: FONT_TITLE
+                      optional: true
+                - name: OUT_DIR
+                  value: "/output"
+              volumeMounts:
+                - name: output-volume
+                  mountPath: /app/luma_payloads
+          volumes:
+            - name: output-volume
+              hostPath:
+                path: /tmp/luma_payloads
+                type: DirectoryOrCreate
+

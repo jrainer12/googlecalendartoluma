@@ -34,6 +34,7 @@ OUT_DIR = os.getenv("OUT_DIR", "luma_payloads")
 DIVIDER = "=" * 60
 # ----------------------------
 
+
 def _slugify_filename(name: str) -> str:
     name = (name or "").strip().lower()
     if not name:
@@ -50,6 +51,7 @@ def _slugify_filename(name: str) -> str:
     slug = slug.strip("-")
     return slug or "event"
 
+
 def embed_to_ics(embed_url: str):
     qs = parse_qs(urlparse(embed_url).query)
     src = qs.get("src", [None])[0]
@@ -59,6 +61,7 @@ def embed_to_ics(embed_url: str):
     cal_id = unquote(src)
     ics_url = f"https://calendar.google.com/calendar/ical/{cal_id}/public/full.ics"
     return ics_url, ctz
+
 
 def load_ics(ics_url: str) -> Calendar:
     logger.info(f"Fetching ICS from: {ics_url}")
@@ -70,6 +73,7 @@ def load_ics(ics_url: str) -> Calendar:
     except requests.RequestException as e:
         logger.error(f"Failed to fetch ICS calendar: {e}")
         raise
+
 
 def _to_dt(v):
     if hasattr(v, "dt"):
@@ -83,10 +87,12 @@ def _to_dt(v):
     dt = datetime(v.year, v.month, v.day, 0, 0, tzinfo=timezone.utc)
     return dt, is_all_day
 
+
 def iso8601_z_with_ms(dt_utc: datetime) -> str:
     base = dt_utc.replace(microsecond=0).isoformat()
     base = base.replace("+00:00", "")
     return f"{base}.000Z"
+
 
 def duration_from_range(start: datetime, end: datetime) -> str:
     seconds = int((end - start).total_seconds())
@@ -96,10 +102,14 @@ def duration_from_range(start: datetime, end: datetime) -> str:
     m = (seconds % 3600) // 60
     s = seconds % 60
     out = "PT"
-    if h: out += f"{h}H"
-    if m: out += f"{m}M"
-    if s or (not h and not m): out += f"{s}S"
+    if h:
+        out += f"{h}H"
+    if m:
+        out += f"{m}M"
+    if s or (not h and not m):
+        out += f"{s}S"
     return out
+
 
 def next_upcoming_events(cal: Calendar, tzname: str, limit=5):
     local_tz = pytz.timezone(tzname)
@@ -130,15 +140,14 @@ def next_upcoming_events(cal: Calendar, tzname: str, limit=5):
     upcoming.sort(key=lambda x: x["start_utc"])
     return upcoming[:limit]
 
+
 # ----- ProseMirror helpers -----
 def make_pm_paragraph(text: str):
     return {"type": "paragraph", "content": [{"type": "text", "text": text}]}
 
+
 def to_prosemirror_doc(desc_text: str, location_text: str):
-    """
-    Build a ProseMirror doc like your sample:
-    {"type":"doc","content":[ {"type":"paragraph","content":[{"type":"text","text":"line"}]}, ... ]}
-    """
+    """Build a ProseMirror doc like your sample."""
     content = []
     desc_text = (desc_text or "").strip()
     if desc_text:
@@ -155,11 +164,8 @@ def to_prosemirror_doc(desc_text: str, location_text: str):
         return None
     return {"type": "doc", "content": content}
 
+
 def build_geo_address(location_text: str):
-    """
-    Build the geo_address_json skeleton required by your example.
-    Without geocoding, we set the fields we don't know to null.
-    """
     if not location_text:
         return None
     loc = location_text.strip()
@@ -167,7 +173,7 @@ def build_geo_address(location_text: str):
         "description": "",
         "full_address": loc,
         "city_state": None,
-        "type": "text",          # we don't have Google Places here; mark as text
+        "type": "text",
         "address": loc,
         "place_id": None,
         "city": None,
@@ -176,8 +182,8 @@ def build_geo_address(location_text: str):
         "region": None
     }
 
+
 def build_payload(ev, tzname, calendar_api_id):
-    # ProseMirror description (from event description + appended "Location: ...")
     pm_doc = to_prosemirror_doc(ev["description"], ev["location"])
 
     payload = {
@@ -187,14 +193,14 @@ def build_payload(ev, tzname, calendar_api_id):
         "zoom_meeting_url": None,
         "zoom_meeting_id": None,
         "zoom_meeting_password": None,
-        "description_mirror": pm_doc,  # ProseMirror object or null
+        "description_mirror": pm_doc,
         "geo_address_visibility": "public",
         "cover_url": COVER_URL,
         "zoom_session_type": None,
         "zoom_creation_method": None,
-        "location_type": "offline",    # hardcoded per your request
-        "geo_address_json": build_geo_address(ev["location"]),  # or null if none
-        "coordinate": None,            # no geocoding here
+        "location_type": "offline",
+        "geo_address_json": build_geo_address(ev["location"]),
+        "coordinate": None,
         "timezone": tzname,
         "calendar_api_id": calendar_api_id,
         "calendar_to_submit_to_api_id": None,
@@ -220,15 +226,16 @@ def build_payload(ev, tzname, calendar_api_id):
     }
     return payload
 
+
 def main():
     try:
         logger.info("Starting Google Calendar to Luma sync")
         os.makedirs(OUT_DIR, exist_ok=True)
         logger.info(f"Output directory: {OUT_DIR}")
-        
+
         ics_url, tzname = embed_to_ics(GCAL_EMBED_URL)
         logger.info(f"Using timezone: {tzname}")
-        
+
         cal = load_ics(ics_url)
         events = next_upcoming_events(cal, tzname, limit=LIMIT)
         logger.info(f"Found {len(events)} upcoming event(s)")
@@ -272,5 +279,7 @@ def main():
         logger.error(f"Error in main: {e}", exc_info=True)
         sys.exit(1)
 
+
 if __name__ == "__main__":
     main()
+
