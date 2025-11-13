@@ -1,5 +1,9 @@
 name: Daily Build
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   schedule:
     # Run daily at 2 AM UTC
