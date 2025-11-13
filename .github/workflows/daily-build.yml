@@ -83,7 +83,8 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Image Digest
-        run: echo "Image pushed: ${{ env.IMAGE_FULL }}"
+        run: |
+          echo "Image pushed: ${{ env.IMAGE_FULL }}"
 
   Summary:
     name: Build Summary
