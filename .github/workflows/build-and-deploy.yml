@@ -28,12 +28,12 @@ on:
       imageNamespace:
         description: 'Docker image namespace/organization'
         required: true
-        default: '${{ github.repository_owner }}'
+        default: ''
 
 env:
   # Default environment variables
   IMAGE_REGISTRY: ${{ github.event.inputs.imageRegistry }}
-  IMAGE_NAMESPACE: ${{ github.event.inputs.imageNamespace }}
+  IMAGE_NAMESPACE: ${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}
 
 jobs:
   Prepare_Data:
@@ -90,7 +90,9 @@ jobs:
       IMAGE_NAME: ${{ matrix.module }}
       IMAGE_NAME_LOWER: ${{ matrix.module_lower }}
       IMAGE_TAG: ${{ github.run_id }}
-      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.run_id }}
+      IMAGE_REGISTRY: ${{ github.event.inputs.imageRegistry }}
+      IMAGE_NAMESPACE: ${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}
+      IMAGE_FULL: ${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ matrix.module_lower }}:${{ github.run_id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -99,7 +101,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: env.IMAGE_REGISTRY == 'ghcr.io'
+        if: github.event.inputs.imageRegistry == 'ghcr.io'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -123,7 +125,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_FULL }}
-            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME_LOWER }}:latest
+            ${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ env.IMAGE_NAME_LOWER }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -173,7 +175,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.Prepare_Data.outputs.matrix_json) }}
     env:
-      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.run_id }}
+      IMAGE_REGISTRY: ${{ github.event.inputs.imageRegistry }}
+      IMAGE_NAMESPACE: ${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}
+      IMAGE_FULL: ${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ matrix.module_lower }}:${{ github.run_id }}
       KUBECONFIG: ${{ secrets.KUBECONFIG }}
     steps:
       - name: Checkout repository
@@ -220,7 +224,7 @@ jobs:
           fi
           
           # Build image repository path
-          IMAGE_REPO="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}"
+          IMAGE_REPO="${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ matrix.module_lower }}"
           IMAGE_TAG="${{ github.run_id }}"
           
           echo "Deploying $RELEASE_NAME to ${{ matrix.environment }}"
@@ -307,10 +311,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Modules Built:** ${{ github.event.inputs.modules }}" >> $GITHUB_STEP_SUMMARY
           echo "**Environments Deployed:** ${{ github.event.inputs.environments }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image Registry:** ${{ env.IMAGE_REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Registry:** ${{ github.event.inputs.imageRegistry }}" >> $GITHUB_STEP_SUMMARY
           echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images Built:" >> $GITHUB_STEP_SUMMARY
-          echo "- ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/api:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/cronjob:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          IMAGE_NS="${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}"
+          echo "- ${{ github.event.inputs.imageRegistry }}/$IMAGE_NS/api:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ${{ github.event.inputs.imageRegistry }}/$IMAGE_NS/cronjob:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
