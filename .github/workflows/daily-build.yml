@@ -55,7 +55,7 @@ jobs:
     env:
       IMAGE_NAME: ${{ matrix.module }}
       IMAGE_NAME_LOWER: ${{ matrix.module_lower }}
-      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.event_name == 'workflow_dispatch' && github.event.inputs.imageTag != '' && github.event.inputs.imageTag || 'latest' }}
+      IMAGE_FULL: ghcr.io/${{ github.repository_owner }}/${{ matrix.module_lower }}:${{ github.event_name == 'workflow_dispatch' && github.event.inputs.imageTag != '' && github.event.inputs.imageTag || 'latest' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,7 +78,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_FULL }}
-            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME_LOWER }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME_LOWER }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
