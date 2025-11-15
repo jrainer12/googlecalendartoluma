@@ -96,6 +96,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU (for arm64 builds)
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -106,7 +109,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker Image
+      - name: Build Docker Image (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: ./${{ env.IMAGE_NAME }}
@@ -114,6 +117,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_FULL }}
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
