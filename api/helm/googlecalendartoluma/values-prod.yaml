@@ -5,7 +5,7 @@ fullnameOverride: "googlecalendartoluma-api"
 
 # Allow Kubernetes to pull from GHCR
 imagePullSecrets:
-  - name: ghcr-cred
+  - name: ghcr-login
 
 config:
   # Show more events in prod than dev
