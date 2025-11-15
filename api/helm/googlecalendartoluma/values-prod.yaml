@@ -1,14 +1,19 @@
-# Development environment overrides
-# Use with: helm install googlecalendartoluma ./helm/googlecalendartoluma -f ./helm/googlecalendartoluma/values-dev.yaml
+# Production environment overrides
+# Used by GitHub Actions when environment=prod
 
 fullnameOverride: "googlecalendartoluma-api"
 
-image:
-  tag: "latest"
+# Allow Kubernetes to pull from GHCR
+imagePullSecrets:
+  - name: ghcr-cred
 
 config:
-  limit: 3
+  # Show more events in prod than dev
+  limit: 5
 
 autoscaling:
-  enabled: false
-
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
