@@ -28,8 +28,10 @@ on:
         type: boolean
 
 env:
+  # Hardcoded registry + namespace (for GHCR)
   IMAGE_REGISTRY: ghcr.io
   IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  # K8s namespace where everything runs
   K8S_NAMESPACE: rainercloud
 
 jobs:
@@ -87,9 +89,9 @@ jobs:
       IMAGE_NAME: ${{ matrix.module }}
       IMAGE_NAME_LOWER: ${{ matrix.module_lower }}
       IMAGE_TAG: ${{ github.run_id }}
-      IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
-      IMAGE_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.run_id }}
+      IMAGE_REGISTRY: ghcr.io
+      IMAGE_NAMESPACE: ${{ github.repository_owner }}
+      IMAGE_FULL: ghcr.io/${{ github.repository_owner }}/${{ matrix.module_lower }}:${{ github.run_id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -120,7 +122,6 @@ jobs:
       - name: Extract test artifacts (if unit tests run)
         if: github.event.inputs.runUnitTests == 'true'
         run: |
-          # Extract test results if they exist
           docker create --name test-container ${{ env.IMAGE_FULL }}
           docker cp test-container:/app/test-results ./test-results || true
           docker cp test-container:/app/coverage.xml ./coverage.xml || true
@@ -150,11 +151,11 @@ jobs:
       name: ${{ matrix.environment }}
 
     env:
-      IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
-      IMAGE_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-      IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}:${{ github.run_id }}
+      IMAGE_REGISTRY: ghcr.io
+      IMAGE_NAMESPACE: ${{ github.repository_owner }}
+      IMAGE_FULL: ghcr.io/${{ github.repository_owner }}/${{ matrix.module_lower }}:${{ github.run_id }}
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
-      K8S_NAMESPACE: ${{ env.K8S_NAMESPACE }}
+      K8S_NAMESPACE: rainercloud
 
     steps:
       - name: Checkout repository
@@ -167,7 +168,6 @@ jobs:
 
       - name: Setup Kubernetes context
         run: |
-          # Setup kubectl config from environment secret (plain or base64)
           echo "${{ env.KUBECONFIG_DATA }}" | base64 -d > kubeconfig.yaml 2>/dev/null || echo "${{ env.KUBECONFIG_DATA }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
           kubectl cluster-info || echo "Warning: Could not connect to cluster - verify KUBECONFIG secret"
@@ -189,20 +189,17 @@ jobs:
           ENVIRONMENT="${{ matrix.environment }}"
           NAMESPACE="${{ env.K8S_NAMESPACE }}"
           
-          # Verify chart exists
           if [ ! -d "$CHART_PATH" ]; then
             echo "Error: Chart path $CHART_PATH not found"
             exit 1
           fi
           
-          # Prefer values-<environment>.yaml if it exists, otherwise values.yaml
           if [ -f "$CHART_PATH/values-$ENVIRONMENT.yaml" ]; then
             VALUES_FILE="$CHART_PATH/values-$ENVIRONMENT.yaml"
           else
             VALUES_FILE="$CHART_PATH/values.yaml"
           fi
           
-          # Build image repository path
           IMAGE_REPO="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}"
           IMAGE_TAG="${{ github.run_id }}"
           
@@ -211,7 +208,6 @@ jobs:
           echo "Values: $VALUES_FILE"
           echo "Image: $IMAGE_REPO:$IMAGE_TAG"
           
-          # Helm upgrade/install
           helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
             --namespace "$NAMESPACE" \
             --create-namespace \
@@ -222,7 +218,6 @@ jobs:
             -f "$VALUES_FILE" \
             --wait --timeout 300s
           
-          # Verify deployment
           kubectl get deployment "$RELEASE_NAME" -n "$NAMESPACE" || echo "Warning: Deployment not found"
           kubectl get svc "$RELEASE_NAME" -n "$NAMESPACE" || echo "Warning: Service not found"
 
@@ -235,7 +230,6 @@ jobs:
           ENVIRONMENT="${{ matrix.environment }}"
           NAMESPACE="${{ env.K8S_NAMESPACE }}"
           
-          # Verify manifests exist
           if [ ! -f "./cronjob/deployment/cronjob.yaml" ]; then
             echo "Error: CronJob manifest not found"
             exit 1
@@ -246,24 +240,19 @@ jobs:
             exit 1
           fi
           
-          # Create temporary manifest with updated image
           cp ./cronjob/deployment/cronjob.yaml ./cronjob-deployment-temp.yaml
           
-          # Update image in CronJob manifest (Linux sed syntax)
           sed -i "s|image:.*|image: ${{ env.IMAGE_FULL }}|g" ./cronjob-deployment-temp.yaml
           sed -i "s|imagePullPolicy:.*|imagePullPolicy: Always|g" ./cronjob-deployment-temp.yaml
           
           echo "Deploying CronJob to environment: $ENVIRONMENT (namespace: $NAMESPACE)"
           echo "Image: ${{ env.IMAGE_FULL }}"
           
-          # Apply ConfigMap and CronJob
           kubectl apply -n "$NAMESPACE" -f ./cronjob/deployment/configmap.yaml
           kubectl apply -n "$NAMESPACE" -f ./cronjob-deployment-temp.yaml
           
-          # Verify CronJob is created
           kubectl get cronjob "${{ matrix.releaseName }}" -n "$NAMESPACE" || echo "Warning: CronJob not found"
           
-          # Cleanup temp file
           rm -f ./cronjob-deployment-temp.yaml
 
   Summary:
