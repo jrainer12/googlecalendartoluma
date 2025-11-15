@@ -168,8 +168,22 @@ jobs:
 
       - name: Setup Kubernetes context
         run: |
+          # Setup kubectl config from environment secret (plain or base64)
           echo "${{ env.KUBECONFIG_DATA }}" | base64 -d > kubeconfig.yaml 2>/dev/null || echo "${{ env.KUBECONFIG_DATA }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
+
+          # Force-select a real context
+          CTX=$(kubectl config get-contexts -o name | head -n 1)
+          if [ -z "$CTX" ]; then
+            echo "❌ No contexts found in kubeconfig"
+            kubectl config get-contexts || true
+            exit 1
+          fi
+
+          echo "Using Kubernetes context: $CTX"
+          kubectl config use-context "$CTX"
+
+          # Sanity check
           kubectl cluster-info || echo "Warning: Could not connect to cluster - verify KUBECONFIG secret"
 
       - name: Install Helm
