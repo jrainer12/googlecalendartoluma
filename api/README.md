@@ -4,7 +4,9 @@ REST API microservice that exposes Google Calendar events as Luma-compatible JSO
 
 ## Features
 
-- RESTful API with Flask
+- RESTful API with FastAPI
+- Automatic Swagger/OpenAPI documentation
+- Interactive API testing via Swagger UI
 - Health check endpoint
 - Fetch all upcoming events or specific event by ID
 - Containerized with Docker/Podman
@@ -56,6 +58,8 @@ python api.py
 ```
 
 4. Access the API:
+- **Swagger UI (Interactive API docs)**: `http://localhost:5000/docs`
+- **ReDoc (Alternative API docs)**: `http://localhost:5000/redoc`
 - Health check: `http://localhost:5000/health`
 - All events: `http://localhost:5000/events`
 - Specific event: `http://localhost:5000/events/1`
@@ -234,7 +238,11 @@ minikube service googlecalendartoluma-api --url
 - `GET /` - API information
 - `GET /health` - Health check endpoint
 - `GET /events` - Get all upcoming events as Luma payloads
-- `GET /events/<id>` - Get a specific event by ID (1-indexed)
+- `GET /events/{id}` - Get a specific event by ID (1-indexed)
+- `GET /docs` - Swagger UI interactive documentation
+- `GET /redoc` - ReDoc alternative documentation
+
+**Note:** FastAPI automatically generates interactive API documentation. Visit `/docs` to explore and test all endpoints directly from your browser!
 
 **Example API Calls:**
 
@@ -251,6 +259,12 @@ curl http://localhost:8080/events/1
 # Get API info
 curl http://localhost:8080/
 ```
+
+**Or use the Swagger UI:**
+- Open `http://localhost:8080/docs` in your browser
+- Click on any endpoint to expand it
+- Click "Try it out" to test the endpoint directly
+- View request/response schemas and examples
 
 **Response Format:**
 

@@ -13,9 +13,9 @@ on:
         required: true
         default: 'api,cronjob'
       environments:
-        description: 'Comma-separated list of environments to deploy (e.g., "dev,prod")'
+        description: 'Comma-separated list of environments to deploy (e.g., "prod,staging")'
         required: true
-        default: 'dev'
+        default: 'prod'
       releaseBuild:
         description: 'Deploy As Release Build'
         required: false
@@ -33,7 +33,7 @@ on:
       imageNamespace:
         description: 'Docker image namespace/organization'
         required: true
-        default: ''
+        default: 'rainercloud'
 
 env:
   # Default environment variables
@@ -130,7 +130,6 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_FULL }}
-            ${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ env.IMAGE_NAME_LOWER }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -156,22 +155,6 @@ jobs:
             coverage.xml
           if-no-files-found: ignore
 
-      # Add SonarQube scan if needed
-      # - name: Sonar Scan
-      #   uses: sonarsource/sonarqube-scan-action@master
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #     SONAR_HOST_URL: https://sonar.example.com
-
-      # Add security scanning if needed
-      # - name: Trivy vulnerability scanner
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: ${{ env.IMAGE_FULL }}
-      #     format: 'sarif'
-      #     output: 'trivy-results.sarif'
-      #   continue-on-error: true
-
   Deploy_To_Kubernetes:
     name: Deploy ${{ matrix.module }} to ${{ matrix.environment }}
     runs-on: ubuntu-latest
@@ -179,11 +162,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.Prepare_Data.outputs.matrix_json) }}
+
+    environment:
+      name: ${{ matrix.environment }}
+
     env:
       IMAGE_REGISTRY: ${{ github.event.inputs.imageRegistry }}
       IMAGE_NAMESPACE: ${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}
       IMAGE_FULL: ${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ matrix.module_lower }}:${{ github.run_id }}
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -195,8 +183,8 @@ jobs:
 
       - name: Setup Kubernetes context
         run: |
-          # Setup kubectl config
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig.yaml || echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          # Setup kubectl config from environment secret (plain or base64)
+          echo "${{ env.KUBECONFIG_DATA }}" | base64 -d > kubeconfig.yaml 2>/dev/null || echo "${{ env.KUBECONFIG_DATA }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
           kubectl cluster-info || echo "Warning: Could not connect to cluster - verify KUBECONFIG secret"
 
@@ -213,7 +201,8 @@ jobs:
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
           
           CHART_PATH="./api/helm/googlecalendartoluma"
-          RELEASE_NAME="${{ matrix.releaseName }}"
+          RELEASE_NAME="${{ matrix.releaseName }}"""
+          ENVIRONMENT="${{ matrix.environment }}"
           
           # Verify chart exists
           if [ ! -d "$CHART_PATH" ]; then
@@ -221,9 +210,9 @@ jobs:
             exit 1
           fi
           
-          # Determine values file based on environment
-          if [ "${{ matrix.environment }}" == "dev" ]; then
-            VALUES_FILE="$CHART_PATH/values-dev.yaml"
+          # Prefer values-<environment>.yaml if it exists, otherwise values.yaml
+          if [ -f "$CHART_PATH/values-$ENVIRONMENT.yaml" ]; then
+            VALUES_FILE="$CHART_PATH/values-$ENVIRONMENT.yaml"
           else
             VALUES_FILE="$CHART_PATH/values.yaml"
           fi
@@ -232,7 +221,7 @@ jobs:
           IMAGE_REPO="${{ github.event.inputs.imageRegistry }}/${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}/${{ matrix.module_lower }}"
           IMAGE_TAG="${{ github.run_id }}"
           
-          echo "Deploying $RELEASE_NAME to ${{ matrix.environment }}"
+          echo "Deploying $RELEASE_NAME to environment: $ENVIRONMENT"
           echo "Chart: $CHART_PATH"
           echo "Values: $VALUES_FILE"
           echo "Image: $IMAGE_REPO:$IMAGE_TAG"
@@ -244,6 +233,7 @@ jobs:
             --set image.repository="$IMAGE_REPO" \
             --set image.tag="$IMAGE_TAG" \
             --set image.pullPolicy=Always \
+            --set env.name="$ENVIRONMENT" \
             -f "$VALUES_FILE" \
             --wait --timeout 300s
           
@@ -256,6 +246,8 @@ jobs:
         if: matrix.module == 'cronjob'
         run: |
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          
+          ENVIRONMENT="${{ matrix.environment }}"
           
           # Verify manifests exist
           if [ ! -f "./cronjob/deployment/cronjob.yaml" ]; then
@@ -275,34 +267,18 @@ jobs:
           sed -i "s|image:.*|image: ${{ env.IMAGE_FULL }}|g" ./cronjob-deployment-temp.yaml
           sed -i "s|imagePullPolicy:.*|imagePullPolicy: Always|g" ./cronjob-deployment-temp.yaml
           
-          echo "Deploying CronJob to ${{ matrix.environment }}"
+          echo "Deploying CronJob to environment: $ENVIRONMENT"
           echo "Image: ${{ env.IMAGE_FULL }}"
           
           # Apply ConfigMap and CronJob
           kubectl apply -f ./cronjob/deployment/configmap.yaml
-          kubectl apply -f ./cronjob/deployment/cronjob-deployment-temp.yaml
+          kubectl apply -f ./cronjob-deployment-temp.yaml
           
           # Verify CronJob is created
           kubectl get cronjob "${{ matrix.releaseName }}" -n default || echo "Warning: CronJob not found"
           
           # Cleanup temp file
           rm -f ./cronjob-deployment-temp.yaml
-
-      # Add Azure AKS deployment if needed
-      # - name: Azure Login
-      #   if: matrix.environment != 'local'
-      #   uses: azure/login@v2
-      #   with:
-      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
-      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      #
-      # - name: Get AKS Credentials
-      #   if: matrix.environment != 'local'
-      #   uses: azure/aks-set-context@v4
-      #   with:
-      #     resource-group: ${{ secrets.AKS_RG }}
-      #     cluster-name: ${{ secrets.AKS_CLUSTER }}
 
   Summary:
     name: Deployment Summary
@@ -317,10 +293,9 @@ jobs:
           echo "**Modules Built:** ${{ github.event.inputs.modules }}" >> $GITHUB_STEP_SUMMARY
           echo "**Environments Deployed:** ${{ github.event.inputs.environments }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image Registry:** ${{ github.event.inputs.imageRegistry }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID (Image Tag):** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images Built:" >> $GITHUB_STEP_SUMMARY
           IMAGE_NS="${{ github.event.inputs.imageNamespace != '' && github.event.inputs.imageNamespace || github.repository_owner }}"
           echo "- ${{ github.event.inputs.imageRegistry }}/$IMAGE_NS/api:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
           echo "- ${{ github.event.inputs.imageRegistry }}/$IMAGE_NS/cronjob:${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-

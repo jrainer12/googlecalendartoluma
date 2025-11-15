@@ -19,5 +19,5 @@ RUN mkdir -p /app/luma_payloads
 
 EXPOSE 5000
 
-CMD ["python", "api.py"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "5000"]
 

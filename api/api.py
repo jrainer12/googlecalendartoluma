@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # API server for Google Calendar to Luma sync
-import os, json, requests, pytz, sys, logging
+import os, json, pytz, sys, logging
 from urllib.parse import urlparse, parse_qs, unquote
 from datetime import datetime, timezone, timedelta
+from typing import List, Optional
 from icalendar import Calendar
-from flask import Flask, jsonify
-from flask_cors import CORS
+import httpx
+import aiofiles
+from fastapi import FastAPI, HTTPException, status, Path
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 # Configure logging
 logging.basicConfig(
@@ -14,8 +18,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for API access
+app = FastAPI(
+    title="Google Calendar to Luma Sync API",
+    description="REST API that exposes Google Calendar events as Luma-compatible JSON payloads",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Enable CORS for API access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---------- CONFIG ----------
 # Read from environment variables with fallback to defaults
@@ -38,6 +56,79 @@ LIMIT = int(os.getenv("LIMIT", "5"))
 OUT_DIR = os.getenv("OUT_DIR", "luma_payloads")
 DIVIDER = "=" * 60
 # ----------------------------
+
+# ---------- PYDANTIC MODELS ----------
+class HealthResponse(BaseModel):
+    status: str = Field(..., description="Health status of the API")
+
+class GeoAddress(BaseModel):
+    description: str = ""
+    full_address: str
+    city_state: Optional[str] = None
+    type: str = "text"
+    address: str
+    place_id: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    country_code: Optional[str] = None
+    region: Optional[str] = None
+
+class TicketType(BaseModel):
+    type: str = "free"
+    ethereum_token_requirements: List[dict] = []
+    cents: Optional[int] = None
+    is_flexible: bool = False
+    min_cents: Optional[int] = None
+    require_approval: bool = False
+    currency: Optional[str] = None
+    is_hidden: bool = False
+
+class EventPayload(BaseModel):
+    name: str = Field(..., description="Event name")
+    start_at: str = Field(..., description="Event start time in ISO8601 format")
+    duration_interval: str = Field(..., description="Event duration in ISO8601 duration format")
+    zoom_meeting_url: Optional[str] = None
+    zoom_meeting_id: Optional[str] = None
+    zoom_meeting_password: Optional[str] = None
+    description_mirror: Optional[dict] = None
+    geo_address_visibility: str = "public"
+    cover_url: str
+    zoom_session_type: Optional[str] = None
+    zoom_creation_method: Optional[str] = None
+    location_type: str = "offline"
+    geo_address_json: Optional[GeoAddress] = None
+    coordinate: Optional[dict] = None
+    timezone: str
+    calendar_api_id: str
+    calendar_to_submit_to_api_id: Optional[str] = None
+    supports_members_only: bool = False
+    max_capacity: Optional[int] = None
+    waitlist_enabled: bool = False
+    visibility: str = "public"
+    theme_meta: dict = {"theme": "legacy"}
+    tint_color: str
+    font_title: str
+    ticket_types: List[TicketType]
+
+class EventResponse(BaseModel):
+    success: bool = Field(..., description="Whether the operation was successful")
+    event: EventPayload = Field(..., description="The event payload")
+
+class EventsResponse(BaseModel):
+    success: bool = Field(..., description="Whether the operation was successful")
+    count: int = Field(..., description="Number of events returned")
+    events: List[EventPayload] = Field(..., description="List of event payloads")
+    timezone: str = Field(..., description="Timezone used for event processing")
+
+class ErrorResponse(BaseModel):
+    success: bool = False
+    error: str = Field(..., description="Error message")
+
+class APIInfoResponse(BaseModel):
+    service: str = "Google Calendar to Luma Sync API"
+    version: str = "1.0.0"
+    endpoints: dict = Field(..., description="Available API endpoints")
+# -------------------------------------
 
 
 def _slugify_filename(name: str) -> str:
@@ -68,14 +159,15 @@ def embed_to_ics(embed_url: str):
     return ics_url, ctz
 
 
-def load_ics(ics_url: str) -> Calendar:
+async def load_ics(ics_url: str) -> Calendar:
     logger.info(f"Fetching ICS from: {ics_url}")
     try:
-        r = requests.get(ics_url, timeout=30)
-        r.raise_for_status()
-        logger.info("Successfully fetched ICS calendar")
-        return Calendar.from_ical(r.content)
-    except requests.RequestException as e:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(ics_url)
+            r.raise_for_status()
+            logger.info("Successfully fetched ICS calendar")
+            return Calendar.from_ical(r.content)
+    except httpx.HTTPError as e:
         logger.error(f"Failed to fetch ICS calendar: {e}")
         raise
 
@@ -228,14 +320,14 @@ def build_payload(ev, tzname, calendar_api_id):
     return payload
 
 
-def fetch_events():
+async def fetch_events():
     """Fetch and process events from Google Calendar"""
     try:
         logger.info("Fetching Google Calendar events")
         os.makedirs(OUT_DIR, exist_ok=True)
 
         ics_url, tzname = embed_to_ics(GCAL_EMBED_URL)
-        cal = load_ics(ics_url)
+        cal = await load_ics(ics_url)
         events = next_upcoming_events(cal, tzname, limit=LIMIT)
         logger.info(f"Found {len(events)} upcoming event(s)")
 
@@ -251,8 +343,10 @@ def fetch_events():
             if os.path.exists(out_path):
                 filename = f"{base_slug}-{idx}.json"
                 out_path = os.path.join(OUT_DIR, filename)
-            with open(out_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, indent=2)
+            
+            # Async file write
+            async with aiofiles.open(out_path, "w", encoding="utf-8") as f:
+                await f.write(json.dumps(payload, ensure_ascii=False, indent=2))
             logger.info(f"Saved payload to {out_path}")
 
         return {
@@ -269,51 +363,94 @@ def fetch_events():
         }
 
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "healthy"}), 200
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Health check",
+    description="Check if the API is running and healthy",
+    tags=["Health"]
+)
+async def health():
+    """Health check endpoint"""
+    return HealthResponse(status="healthy")
 
 
-@app.route("/events", methods=["GET"])
-def get_events():
-    result = fetch_events()
-    return jsonify(result), 200 if result["success"] else 500
-
-
-@app.route("/events/<int:event_id>", methods=["GET"])
-def get_event(event_id):
-    result = fetch_events()
+@app.get(
+    "/events",
+    response_model=EventsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get all upcoming events",
+    description="Fetch all upcoming events from Google Calendar and return them as Luma-compatible JSON payloads",
+    tags=["Events"]
+)
+async def get_events():
+    """Get all upcoming events from Google Calendar"""
+    result = await fetch_events()
     if not result["success"]:
-        return jsonify(result), 500
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get("error", "Failed to fetch events")
+        )
+    return EventsResponse(**result)
+
+
+@app.get(
+    "/events/{event_id}",
+    response_model=EventResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get specific event by ID",
+    description="Get a specific event by its ID (1-indexed)",
+    tags=["Events"]
+)
+async def get_event(event_id: int = Path(..., ge=1, description="Event ID (1-indexed)")):
+    """Get a specific event by ID"""
+    result = await fetch_events()
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get("error", "Failed to fetch events")
+        )
 
     if event_id < 1 or event_id > result["count"]:
-        return jsonify({
-            "success": False,
-            "error": f"Event ID {event_id} not found. Available IDs: 1-{result['count']}"
-        }), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Event ID {event_id} not found. Available IDs: 1-{result['count']}"
+        )
 
-    return jsonify({
-        "success": True,
-        "event": result["events"][event_id - 1]
-    }), 200
+    return EventResponse(
+        success=True,
+        event=result["events"][event_id - 1]
+    )
 
 
-@app.route("/", methods=["GET"])
-def root():
-    return jsonify({
-        "service": "Google Calendar to Luma Sync API",
-        "version": "1.0.0",
-        "endpoints": {
+@app.get(
+    "/",
+    response_model=APIInfoResponse,
+    status_code=status.HTTP_200_OK,
+    summary="API information",
+    description="Get information about the API and available endpoints",
+    tags=["Info"]
+)
+async def root():
+    """Root endpoint with API information"""
+    return APIInfoResponse(
+        service="Google Calendar to Luma Sync API",
+        version="1.0.0",
+        endpoints={
             "/health": "Health check",
             "/events": "Get all upcoming events",
-            "/events/<id>": "Get specific event by ID (1-indexed)"
+            "/events/{id}": "Get specific event by ID (1-indexed)",
+            "/docs": "Swagger UI documentation",
+            "/redoc": "ReDoc documentation"
         }
-    }), 200
+    )
 
 
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.getenv("PORT", "5000"))
     host = os.getenv("HOST", "0.0.0.0")
     logger.info(f"Starting API server on {host}:{port}")
-    app.run(host=host, port=port, debug=False)
+    uvicorn.run(app, host=host, port=port)
 
