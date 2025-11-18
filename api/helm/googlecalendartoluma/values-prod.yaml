@@ -31,6 +31,7 @@ ingress:
   hosts:
     - host: ""
       paths:
-        - path: /
+        - path: /backend/luma-syncer
           pathType: Prefix
+          portName: http
   tls: []

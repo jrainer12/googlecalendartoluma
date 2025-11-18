@@ -35,7 +35,31 @@ spec:
               service:
                 name: {{ include "googlecalendartoluma-api.fullname" $ }}
                 port:
+                  {{- if .portName }}
+                    {{- /* Use portName to reference service port by name */}}
+                    {{- $portName := .portName }}
+                    {{- if $.Values.service.ports }}
+                      {{- $foundPort := false }}
+                      {{- range $.Values.service.ports }}
+                        {{- if eq .name $portName }}
+                  name: {{ $portName }}
+                          {{- $foundPort = true }}
+                        {{- end }}
+                      {{- end }}
+                      {{- if not $foundPort }}
+                        {{- fail (printf "Port name '%s' not found in service.ports" $portName) }}
+                      {{- end }}
+                    {{- else }}
+                      {{- /* Fallback to default http port if using single port config */}}
                   number: {{ $.Values.service.port }}
+                    {{- end }}
+                  {{- else if .portNumber }}
+                    {{- /* Use explicit port number */}}
+                  number: {{ .portNumber }}
+                  {{- else }}
+                    {{- /* Default: use service.port for backward compatibility */}}
+                  number: {{ $.Values.service.port }}
+                  {{- end }}
           {{- end }}
     {{- end }}
 {{- end }}

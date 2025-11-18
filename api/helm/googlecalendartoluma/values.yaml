@@ -11,8 +11,11 @@ fullnameOverride: "googlecalendartoluma-api"
 
 service:
   type: ClusterIP
-  port: 80
-  targetPort: 5000
+  ports:
+   - name: http
+     port: 80
+     targetPort: 5000
+     protocol: TCP
 
 config:
   gcalEmbedUrl: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"

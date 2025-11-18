@@ -30,9 +30,17 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            {{- if .Values.service.ports }}
+              {{- range .Values.service.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .targetPort }}
+              protocol: {{ .protocol | default "TCP" }}
+              {{- end }}
+            {{- else }}
             - name: http
-              containerPort: {{ .Values.service.targetPort }}
+              containerPort: {{ .Values.service.targetPort | default 5000 }}
               protocol: TCP
+            {{- end }}
           env:
             - name: GCAL_EMBED_URL
               valueFrom:
@@ -72,7 +80,7 @@ spec:
             - name: OUT_DIR
               value: "/app/luma_payloads"
             - name: PORT
-              value: "{{ .Values.service.targetPort }}"
+              value: "{{ if .Values.service.ports }}{{ (index .Values.service.ports 0).targetPort }}{{ else }}{{ .Values.service.targetPort | default 5000 }}{{ end }}"
             - name: HOST
               value: "0.0.0.0"
           livenessProbe:
