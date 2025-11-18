@@ -10,7 +10,7 @@ data:
   {{- end }}
   {{- if .Values.env }}
   {{- range $key, $value := .Values.env }}
-  {{- if not $value.valueFrom }}
+  {{- if kindIs "string" $value }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- end }}
