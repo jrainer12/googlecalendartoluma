@@ -408,19 +408,6 @@ async def fetch_events():
 
 
 @api_router.get(
-    "/health",
-    response_model=HealthResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Health check",
-    description="Check if the API is running and healthy",
-    tags=["Health"]
-)
-async def health():
-    """Health check endpoint"""
-    return HealthResponse(status="healthy")
-
-
-@api_router.get(
     "/events",
     response_model=EventsResponse,
     status_code=status.HTTP_200_OK,
@@ -492,6 +479,19 @@ async def root():
     )
 
 
+# Health check endpoint at root level (for Kubernetes probes)
+# This doesn't use the base route prefix so probes can access it directly
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Health check",
+    description="Check if the API is running and healthy",
+    tags=["Health"]
+)
+async def health():
+    """Health check endpoint - accessible at root level for Kubernetes probes"""
+    return HealthResponse(status="healthy")
 
 
 if __name__ == "__main__":
