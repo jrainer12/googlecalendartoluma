@@ -4,26 +4,70 @@ import os, json, pytz, sys, logging
 from urllib.parse import urlparse, parse_qs, unquote
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
+from contextlib import asynccontextmanager
 from icalendar import Calendar
 import httpx
 import aiofiles
-from fastapi import FastAPI, HTTPException, status, Path
+from fastapi import FastAPI, HTTPException, status, Path, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from util.config import config, get_logging_level, get_base_route_http
 
-# Configure logging
+# Configure logging - will be updated after config loads
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
+# Create API router - will be mounted with base route prefix after config loads
+api_router = APIRouter()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown."""
+    # Startup
+    await config.load_config()
+    
+    # Update logging level after config is loaded
+    log_level = getattr(logging, get_logging_level().upper(), logging.INFO)
+    logging.getLogger().setLevel(log_level)
+    
+    # Log the active profile
+    deployment_profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
+    logger.info(f"Profile {deployment_profile} activated.")
+    
+    # Check if debug mode is enabled and log if so
+    debug_mode = config.get_bool("app.debug", False) or (log_level == logging.DEBUG)
+    if debug_mode:
+        logger.debug("Debug mode has been activated")
+    
+    # Get base route and mount the API router
+    base_route = get_base_route_http()
+    app.include_router(api_router, prefix=base_route)
+    
+    # Set up docs URLs with base route prefix
+    app.docs_url = f"{base_route}/docs"
+    app.redoc_url = f"{base_route}/redoc"
+    
+    logger.info(f"Application started with logging level: {log_level}")
+    logger.info(f"API routes mounted at base path: {base_route}")
+    
+    yield  # Application is running
+    
+    # Shutdown (if needed in the future)
+    logger.info("Application shutting down")
+
+
+# Create main FastAPI app with lifespan handler
 app = FastAPI(
     title="Google Calendar to Luma Sync API",
     description="REST API that exposes Google Calendar events as Luma-compatible JSON payloads",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url=None,  # Will be set in lifespan handler
+    redoc_url=None,  # Will be set in lifespan handler
+    lifespan=lifespan
 )
 
 # Enable CORS for API access
@@ -363,7 +407,7 @@ async def fetch_events():
         }
 
 
-@app.get(
+@api_router.get(
     "/health",
     response_model=HealthResponse,
     status_code=status.HTTP_200_OK,
@@ -376,7 +420,7 @@ async def health():
     return HealthResponse(status="healthy")
 
 
-@app.get(
+@api_router.get(
     "/events",
     response_model=EventsResponse,
     status_code=status.HTTP_200_OK,
@@ -395,7 +439,7 @@ async def get_events():
     return EventsResponse(**result)
 
 
-@app.get(
+@api_router.get(
     "/events/{event_id}",
     response_model=EventResponse,
     status_code=status.HTTP_200_OK,
@@ -424,7 +468,7 @@ async def get_event(event_id: int = Path(..., ge=1, description="Event ID (1-ind
     )
 
 
-@app.get(
+@api_router.get(
     "/",
     response_model=APIInfoResponse,
     status_code=status.HTTP_200_OK,
@@ -434,17 +478,20 @@ async def get_event(event_id: int = Path(..., ge=1, description="Event ID (1-ind
 )
 async def root():
     """Root endpoint with API information"""
+    base_route = get_base_route_http()
     return APIInfoResponse(
         service="Google Calendar to Luma Sync API",
         version="1.0.0",
         endpoints={
-            "/health": "Health check",
-            "/events": "Get all upcoming events",
-            "/events/{id}": "Get specific event by ID (1-indexed)",
-            "/docs": "Swagger UI documentation",
-            "/redoc": "ReDoc documentation"
+            f"{base_route}/health": "Health check",
+            f"{base_route}/events": "Get all upcoming events",
+            f"{base_route}/events/{{id}}": "Get specific event by ID (1-indexed)",
+            f"{base_route}/docs": "Swagger UI documentation",
+            f"{base_route}/redoc": "ReDoc documentation"
         }
     )
+
+
 
 
 if __name__ == "__main__":

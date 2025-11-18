@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "googlecalendartoluma-api.fullname" . }}
+  name: {{ include "app.fullname" . }}
   labels:
-    {{- include "googlecalendartoluma-api.labels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "googlecalendartoluma-api.selectorLabels" . | nindent 6 }}
+      {{- include "app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,10 +16,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "googlecalendartoluma-api.selectorLabels" . | nindent 8 }}
+        {{- include "app.selectorLabels" . | nindent 8 }}
     spec:
       {{- if .Values.serviceAccount.create }}
-      serviceAccountName: {{ include "googlecalendartoluma-api.fullname" . }}
+      serviceAccountName: {{ include "app.fullname" . }}
       {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -42,47 +42,36 @@ spec:
               protocol: TCP
             {{- end }}
           env:
-            - name: GCAL_EMBED_URL
+            {{- range $key, $value := .Values.config }}
+            - name: {{ $key | upper }}
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: GCAL_EMBED_URL
-            - name: LUMA_CALENDAR_API_ID
+                  name: {{ include "app.fullname" $ }}-config
+                  key: {{ $key | upper }}
+            {{- end }}
+            {{- if .Values.env }}
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              {{- if $value.valueFrom }}
+              {{- toYaml $value.valueFrom | nindent 14 }}
+              {{- else }}
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: LUMA_CALENDAR_API_ID
-            - name: TIMEZONE_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: TIMEZONE_NAME
-            - name: LIMIT
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: LIMIT
-            - name: COVER_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: COVER_URL
-            - name: TINT_COLOR
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: TINT_COLOR
-            - name: FONT_TITLE
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "googlecalendartoluma-api.fullname" . }}-config
-                  key: FONT_TITLE
-            - name: OUT_DIR
-              value: "/app/luma_payloads"
+                  name: {{ include "app.fullname" $ }}-config
+                  key: {{ $key }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.envVars }}
+            {{- range $key, $value := .Values.envVars }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
             - name: PORT
               value: "{{ if .Values.service.ports }}{{ (index .Values.service.ports 0).targetPort }}{{ else }}{{ .Values.service.targetPort | default 5000 }}{{ end }}"
             - name: HOST
-              value: "0.0.0.0"
+              value: "{{ .Values.host | default "0.0.0.0" }}"
           livenessProbe:
             httpGet:
               path: /health

@@ -1,0 +1,6 @@
+app:
+  logging_level: "INFO"
+  debug: false
+  enable_spring_config: false
+  spring_cloud_config_name: "api-google-calendar-to-luma"
+

@@ -1,7 +1,7 @@
 # Production environment overrides
 # Used by GitHub Actions when environment=prod
 
-fullnameOverride: "googlecalendartoluma-api"
+fullnameOverride: ""
 
 # Allow Kubernetes to pull from GHCR
 imagePullSecrets:
@@ -10,6 +10,32 @@ imagePullSecrets:
 config:
   # Show more events in prod than dev
   limit: 5
+
+# Environment variables for production
+# These can reference secrets or ConfigMaps
+env:
+  DEPLOYMENT_PROFILE: "prod"
+  # Example Spring Cloud Config (uncomment and configure as needed):
+  # SPRING_TENANT:
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: spring-cloud-config
+  #       key: TENANT
+  # SPRING_CLIENT_ID:
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: spring-cloud-config
+  #       key: CLIENT_ID
+  # SPRING_CLIENT_SECRET:
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: spring-cloud-config
+  #       key: CLIENT_SECRET
+  # SPRING_SCOPE:
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: spring-cloud-config
+  #       key: SCOPE
 
 autoscaling:
   enabled: true

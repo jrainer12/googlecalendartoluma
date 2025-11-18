@@ -1,13 +1,13 @@
 replicaCount: 1
 
 image:
-  repository: localhost/googlecalendartoluma-api
+  repository: localhost/my-api
   pullPolicy: Never
   tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""
-fullnameOverride: "googlecalendartoluma-api"
+fullnameOverride: ""
 
 service:
   type: ClusterIP
@@ -17,6 +17,8 @@ service:
      targetPort: 5000
      protocol: TCP
 
+# Generic config map - add any key-value pairs here
+# They will be converted to environment variables in the ConfigMap
 config:
   gcalEmbedUrl: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
   lumaCalendarApiId: "cal-iPlAn4RA1wD1lDh"
@@ -25,6 +27,13 @@ config:
   coverUrl: "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
   tintColor: "#708967"
   fontTitle: "geist-mono"
+
+env: {}
+
+envVars: {}
+
+# Host binding for the application
+host: "0.0.0.0"
 
 resources:
   limits:
@@ -75,7 +84,7 @@ ingress:
   className: "nginx"
   annotations: {}
   hosts:
-    - host: googlecalendartoluma.local
+    - host: api.example.com
       paths:
         - path: /
           pathType: Prefix

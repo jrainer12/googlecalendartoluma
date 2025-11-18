@@ -14,6 +14,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api.py .
+COPY util/ ./util/
+COPY resources/ ./resources/
 
 RUN mkdir -p /app/luma_payloads
 

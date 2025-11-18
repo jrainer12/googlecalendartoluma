@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "googlecalendartoluma-api.fullname" . }}
+  name: {{ include "app.fullname" . }}
   labels:
-    {{- include "googlecalendartoluma-api.labels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -33,7 +33,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "googlecalendartoluma-api.fullname" $ }}
+                name: {{ include "app.fullname" $ }}
                 port:
                   {{- if .portName }}
                     {{- /* Use portName to reference service port by name */}}
