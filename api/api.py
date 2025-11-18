@@ -27,32 +27,47 @@ api_router = APIRouter()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
-    # Startup
-    await config.load_config()
+    # Startup - wrap in try/except to ensure app starts even if config fails
+    try:
+        await config.load_config()
+        
+        # Update logging level after config is loaded
+        log_level = getattr(logging, get_logging_level().upper(), logging.INFO)
+        logging.getLogger().setLevel(log_level)
+        
+        # Log the active profile
+        deployment_profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
+        logger.info(f"Profile {deployment_profile} activated.")
+        
+        # Check if debug mode is enabled and log if so
+        debug_mode = config.get_bool("app.debug", False) or (log_level == logging.DEBUG)
+        if debug_mode:
+            logger.debug("Debug mode has been activated")
+        
+        # Get base route and mount the API router
+        base_route = get_base_route_http()
+        app.include_router(api_router, prefix=base_route)
+        
+        # Set up docs URLs with base route prefix
+        app.docs_url = f"{base_route}/docs"
+        app.redoc_url = f"{base_route}/redoc"
+        
+        logger.info(f"Application started with logging level: {log_level}")
+        logger.info(f"API routes mounted at base path: {base_route}")
+    except Exception as e:
+        logger.error(f"Error during startup: {e}", exc_info=True)
+        # Still try to mount router with default base route
+        try:
+            base_route = os.getenv('APP_BASE_ROUTE_HTTP', '/backend/luma-syncer')
+            app.include_router(api_router, prefix=base_route)
+            logger.warning(f"Using default base route: {base_route}")
+        except Exception as e2:
+            logger.error(f"Failed to mount router: {e2}", exc_info=True)
     
-    # Update logging level after config is loaded
-    log_level = getattr(logging, get_logging_level().upper(), logging.INFO)
-    logging.getLogger().setLevel(log_level)
-    
-    # Log the active profile
-    deployment_profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
-    logger.info(f"Profile {deployment_profile} activated.")
-    
-    # Check if debug mode is enabled and log if so
-    debug_mode = config.get_bool("app.debug", False) or (log_level == logging.DEBUG)
-    if debug_mode:
-        logger.debug("Debug mode has been activated")
-    
-    # Get base route and mount the API router
-    base_route = get_base_route_http()
-    app.include_router(api_router, prefix=base_route)
-    
-    # Set up docs URLs with base route prefix
-    app.docs_url = f"{base_route}/docs"
-    app.redoc_url = f"{base_route}/redoc"
-    
-    logger.info(f"Application started with logging level: {log_level}")
-    logger.info(f"API routes mounted at base path: {base_route}")
+    # Log all registered routes for debugging
+    routes = [f"{route.path} ({route.methods})" for route in app.routes if hasattr(route, 'path')]
+    logger.info(f"Registered routes: {routes}")
+    logger.info(f"Health endpoint available at: /health")
     
     yield  # Application is running
     
@@ -104,6 +119,45 @@ DIVIDER = "=" * 60
 # ---------- PYDANTIC MODELS ----------
 class HealthResponse(BaseModel):
     status: str = Field(..., description="Health status of the API")
+
+# Health check endpoint function - will be registered at both root and router level
+async def health_check():
+    """Health check endpoint - accessible at root level for Kubernetes probes.
+    
+    This endpoint is always available, even before configuration loads.
+    It does not depend on any application state or configuration.
+    """
+    logger.debug("Health check endpoint called")
+    return HealthResponse(status="healthy")
+
+# Register health endpoint at root level (for Kubernetes probes)
+# This must be available immediately, even before config loads
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Health check",
+    description="Check if the API is running and healthy",
+    tags=["Health"],
+    include_in_schema=True
+)
+async def health():
+    """Health check endpoint - accessible at root level for Kubernetes probes"""
+    return await health_check()
+
+# Also register on router so it's available at base_route/health
+@api_router.get(
+    "/health",
+    response_model=HealthResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Health check",
+    description="Check if the API is running and healthy",
+    tags=["Health"],
+    include_in_schema=True
+)
+async def health_router():
+    """Health check endpoint - also available at base route"""
+    return await health_check()
 
 class GeoAddress(BaseModel):
     description: str = ""
@@ -477,21 +531,6 @@ async def root():
             f"{base_route}/redoc": "ReDoc documentation"
         }
     )
-
-
-# Health check endpoint at root level (for Kubernetes probes)
-# This doesn't use the base route prefix so probes can access it directly
-@app.get(
-    "/health",
-    response_model=HealthResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Health check",
-    description="Check if the API is running and healthy",
-    tags=["Health"]
-)
-async def health():
-    """Health check endpoint - accessible at root level for Kubernetes probes"""
-    return HealthResponse(status="healthy")
 
 
 if __name__ == "__main__":
