@@ -52,13 +52,17 @@ spec:
             {{- if .Values.env }}
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
-              {{- if $value.valueFrom }}
-              {{- toYaml $value.valueFrom | nindent 14 }}
-              {{- else }}
+              {{- if kindIs "map" $value }}
+                {{- if hasKey $value "valueFrom" }}
+                  {{- toYaml $value.valueFrom | nindent 14 }}
+                {{- else }}
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "app.fullname" $ }}-config
                   key: {{ $key }}
+                {{- end }}
+              {{- else }}
+              value: {{ $value | quote }}
               {{- end }}
             {{- end }}
             {{- end }}
