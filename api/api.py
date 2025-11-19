@@ -103,20 +103,19 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutting down")
 
 
-# Get base route synchronously for docs URLs and root_path (before config loads)
+# Get base route synchronously for docs URLs (before config loads)
 # This will be overridden with actual config value in lifespan handler if different
 _base_route_sync = get_base_route_sync()
 
 # Create main FastAPI app with lifespan handler
-# root_path is required when behind a reverse proxy with a path prefix
-# This ensures Swagger UI generates correct URLs
+# Note: We don't use root_path because the ingress forwards the full path
+# The router will be mounted with the base route prefix, and docs will be at the full path
 app = FastAPI(
     title="Google Calendar to Luma Sync API",
     description="REST API that exposes Google Calendar events as Luma-compatible JSON payloads",
     version="1.0.0",
-    root_path=_base_route_sync,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=f"{_base_route_sync}/docs",
+    redoc_url=f"{_base_route_sync}/redoc",
     lifespan=lifespan
 )
 
