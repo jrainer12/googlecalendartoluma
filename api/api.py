@@ -24,6 +24,33 @@ logger = logging.getLogger(__name__)
 api_router = APIRouter()
 
 
+def get_base_route_sync() -> str:
+    """Get base route synchronously from environment variable, YAML file, or default.
+    Used for setting docs_url at app creation time before config loads."""
+    # Check environment variable first
+    env_value = os.getenv('APP_BASE_ROUTE_HTTP')
+    if env_value:
+        return env_value
+    
+    # Try to read from YAML file synchronously
+    try:
+        import yaml
+        from pathlib import Path
+        resources_path = Path(__file__).parent / "resources"
+        app_yaml = resources_path / "application.yaml"
+        if app_yaml.exists():
+            with open(app_yaml, 'r') as f:
+                yaml_data = yaml.safe_load(f) or {}
+                base_route = yaml_data.get('app', {}).get('base_route_http')
+                if base_route:
+                    return base_route
+    except Exception as e:
+        logger.debug(f"Could not read base_route from YAML synchronously: {e}")
+    
+    # Default fallback
+    return '/backend/luma-syncer'
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
@@ -48,12 +75,13 @@ async def lifespan(app: FastAPI):
         base_route = get_base_route_http()
         app.include_router(api_router, prefix=base_route)
         
-        # Set up docs URLs with base route prefix
-        app.docs_url = f"{base_route}/docs"
-        app.redoc_url = f"{base_route}/redoc"
+        # Note: docs_url and redoc_url are set at app creation time and cannot be changed
+        # They are set to use the base route from environment variable or default
         
         logger.info(f"Application started with logging level: {log_level}")
         logger.info(f"API routes mounted at base path: {base_route}")
+        logger.info(f"Swagger docs available at: {app.docs_url}")
+        logger.info(f"ReDoc available at: {app.redoc_url}")
     except Exception as e:
         logger.error(f"Error during startup: {e}", exc_info=True)
         # Still try to mount router with default base route
@@ -75,13 +103,20 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutting down")
 
 
+# Get base route synchronously for docs URLs and root_path (before config loads)
+# This will be overridden with actual config value in lifespan handler if different
+_base_route_sync = get_base_route_sync()
+
 # Create main FastAPI app with lifespan handler
+# root_path is required when behind a reverse proxy with a path prefix
+# This ensures Swagger UI generates correct URLs
 app = FastAPI(
     title="Google Calendar to Luma Sync API",
     description="REST API that exposes Google Calendar events as Luma-compatible JSON payloads",
     version="1.0.0",
-    docs_url=None,  # Will be set in lifespan handler
-    redoc_url=None,  # Will be set in lifespan handler
+    root_path=_base_route_sync,
+    docs_url="/docs",
+    redoc_url="/redoc",
     lifespan=lifespan
 )
 
