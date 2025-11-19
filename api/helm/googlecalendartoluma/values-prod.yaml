@@ -48,6 +48,7 @@ ingress:
   enabled: true
   className: "nginx"
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-cloudflare
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-origin: "*"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
@@ -63,4 +64,4 @@ ingress:
   tls:
     - hosts:
         - rainercloud.com
-      #secretName: luma-syncer-tls
+      secretName: rainercloud-tls
