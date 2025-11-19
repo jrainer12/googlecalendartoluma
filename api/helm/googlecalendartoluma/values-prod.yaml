@@ -55,9 +55,12 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
   hosts:
-    - host: ""
+    - host: "rainercloud.com"
       paths:
         - path: /backend/luma-syncer
           pathType: Prefix
           portName: http
-  tls: []
+  tls:
+    - hosts:
+        - rainercloud.com
+      #secretName: luma-syncer-tls
