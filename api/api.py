@@ -8,8 +8,11 @@ from contextlib import asynccontextmanager
 from icalendar import Calendar
 import httpx
 import aiofiles
-from fastapi import FastAPI, HTTPException, status, Path, APIRouter
+from fastapi import FastAPI, HTTPException, status, Path, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel, Field
 from util.config import config, get_logging_level, get_base_route_http
 
@@ -71,12 +74,13 @@ async def lifespan(app: FastAPI):
         if debug_mode:
             logger.debug("Debug mode has been activated")
         
-        # Get base route and mount the API router
+        # Get base route and mount the API router with prefix
         base_route = get_base_route_http()
+        # Mount router with prefix for route matching
         app.include_router(api_router, prefix=base_route)
         
-        # Note: docs_url and redoc_url are set at app creation time and cannot be changed
-        # They are set to use the base route from environment variable or default
+        # Note: docs_url and redoc_url are set at app creation with full path
+        # They should be accessible at {base_route}/docs and {base_route}/redoc
         
         logger.info(f"Application started with logging level: {log_level}")
         logger.info(f"API routes mounted at base path: {base_route}")
@@ -103,19 +107,20 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutting down")
 
 
-# Get base route synchronously for docs URLs (before config loads)
+# Get base route synchronously (before config loads)
 # This will be overridden with actual config value in lifespan handler if different
 _base_route_sync = get_base_route_sync()
 
 # Create main FastAPI app with lifespan handler
-# Note: We don't use root_path because the ingress forwards the full path
-# The router will be mounted with the base route prefix, and docs will be at the full path
+# Use root_path so FastAPI knows the base path for URL generation
+# The ingress forwards the full path, so we mount router with prefix
 app = FastAPI(
     title="Google Calendar to Luma Sync API",
     description="REST API that exposes Google Calendar events as Luma-compatible JSON payloads",
     version="1.0.0",
-    docs_url=f"{_base_route_sync}/docs",
-    redoc_url=f"{_base_route_sync}/redoc",
+    root_path=_base_route_sync,
+    docs_url="/docs",
+    redoc_url="/redoc",
     lifespan=lifespan
 )
 
@@ -564,6 +569,40 @@ async def root():
             f"{base_route}/docs": "Swagger UI documentation",
             f"{base_route}/redoc": "ReDoc documentation"
         }
+    )
+
+
+# Add docs endpoints to router so they're accessible under base route
+@api_router.get("/docs", include_in_schema=False)
+async def swagger_ui(request: Request):
+    """Swagger UI documentation"""
+    base_route = get_base_route_http()
+    return get_swagger_ui_html(
+        openapi_url=f"{base_route}/openapi.json",
+        title=app.title + " - Swagger UI"
+    )
+
+
+@api_router.get("/redoc", include_in_schema=False)
+async def redoc_html(request: Request):
+    """ReDoc documentation"""
+    base_route = get_base_route_http()
+    return get_redoc_html(
+        openapi_url=f"{base_route}/openapi.json",
+        title=app.title + " - ReDoc"
+    )
+
+
+@api_router.get("/openapi.json", include_in_schema=False)
+async def openapi():
+    """OpenAPI schema"""
+    base_route = get_base_route_http()
+    return get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        servers=[{"url": base_route}] if base_route else None
     )
 
 
