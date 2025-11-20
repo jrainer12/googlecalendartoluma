@@ -76,16 +76,13 @@ async def lifespan(app: FastAPI):
         
         # Get base route and mount the API router with prefix
         base_route = get_base_route_http()
-        # Mount router with prefix for route matching
+        # Mount router with prefix - all routes will be under base_route
         app.include_router(api_router, prefix=base_route)
-        
-        # Note: docs_url and redoc_url are set at app creation with full path
-        # They should be accessible at {base_route}/docs and {base_route}/redoc
         
         logger.info(f"Application started with logging level: {log_level}")
         logger.info(f"API routes mounted at base path: {base_route}")
-        logger.info(f"Swagger docs available at: {app.docs_url}")
-        logger.info(f"ReDoc available at: {app.redoc_url}")
+        logger.info(f"Swagger docs available at: {base_route}/docs")
+        logger.info(f"ReDoc available at: {base_route}/redoc")
     except Exception as e:
         logger.error(f"Error during startup: {e}", exc_info=True)
         # Still try to mount router with default base route
@@ -112,15 +109,14 @@ async def lifespan(app: FastAPI):
 _base_route_sync = get_base_route_sync()
 
 # Create main FastAPI app with lifespan handler
-# Use root_path so FastAPI knows the base path for URL generation
-# The ingress forwards the full path, so we mount router with prefix
+# Don't use root_path - the ingress forwards the full path, router handles the prefix
+# Docs will be added to the router so they're under the base route
 app = FastAPI(
     title="Google Calendar to Luma Sync API",
     description="REST API that exposes Google Calendar events as Luma-compatible JSON payloads",
     version="1.0.0",
-    root_path=_base_route_sync,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None,  # Disabled - we add docs to router
+    redoc_url=None,  # Disabled - we add docs to router
     lifespan=lifespan
 )
 
