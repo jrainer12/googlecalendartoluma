@@ -79,6 +79,9 @@ autoscaling:
           periodSeconds: 60
       selectPolicy: Max
 
+ingress:
+  enabled: false
+
 gateway:
   enabled: false
   namespace: ""  # Leave empty to use release namespace
