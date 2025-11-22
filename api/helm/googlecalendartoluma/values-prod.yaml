@@ -100,4 +100,26 @@ gateway:
   #
   filters: []
 
+#ingress:
+#  enabled: true
+#  className: "nginx"
+#  annotations:
+#    cert-manager.io/cluster-issuer: letsencrypt-cloudflare
+#    nginx.ingress.kubernetes.io/enable-cors: "true"
+#    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+#    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+#    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+#    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+#    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+#  hosts:
+#    - host: "rainercloud.com"
+#      paths:
+#        - path: /backend/luma-syncer
+#          pathType: Prefix
+#          portName: http
+#  tls:
+#    - hosts:
+#        - rainercloud.com
+#      secretName: rainercloud-tls
+
 
