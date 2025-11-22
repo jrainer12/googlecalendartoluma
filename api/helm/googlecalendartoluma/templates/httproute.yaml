@@ -3,7 +3,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ include "app.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.gateway.namespace | default .Release.Namespace }}
   labels:
     {{- include "app.labels" . | nindent 4 }}
   {{- with .Values.gateway.annotations }}
@@ -30,14 +30,8 @@ spec:
             value: {{ .Values.gateway.pathPrefix | default "/" | quote }}
       backendRefs:
         - name: {{ include "app.fullname" . }}
-          # namespace omitted so it defaults to this HTTPRoute's namespace (.Release.Namespace)
-          port: {{- if .Values.gateway.backendPort -}}
-            {{ .Values.gateway.backendPort }}
-          {{- else if .Values.service.ports -}}
-            {{ (index .Values.service.ports 0).port }}
-          {{- else -}}
-            {{ .Values.service.port | default 80 }}
-          {{- end }}
+          # namespace omitted so it defaults to this HTTPRoute's namespace
+          port: {{ .Values.gateway.backendPort | default 80 }}
           weight: 100
       {{- with .Values.gateway.filters }}
       filters:
