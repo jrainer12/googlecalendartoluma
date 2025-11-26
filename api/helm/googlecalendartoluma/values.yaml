@@ -13,7 +13,7 @@ service:
   type: ClusterIP
   ports:
    - name: http
-     port: 80
+     port: 5000
      targetPort: 5000
      protocol: TCP
 
@@ -81,12 +81,60 @@ autoscaling:
 
 ingress:
   enabled: false
-  className: "nginx"
-  annotations: {}
-  hosts:
-    - host: api.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
+
+gateway:
+  enabled: false
+  namespace: ""  # Leave empty to use release namespace
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-cloudflare
+
+  parentRefs:
+    - name: public-gateway-nginx         # shared Gateway name
+      namespace: nginx-gateway
+
+  hostnames:
+    - rainercloud.com
+
+  # External path to match on the Gateway.
+  # Your app will usually see this rewritten to "/" via a URLRewrite filter.
+  pathPrefix: "/"
+
+  # When you want multiple backends (e.g. HTTP + WebSocket on same pod),
+  # add additional entries here.
+  backends:
+    - name: luma-syncer            # Service name (defaults to app.fullname if omitted in template)
+      port: 5000                   # HTTP REST port
+      weight: 100
+
+  # Fallback if backends is not set (single backend)
+  backendPort: 5000
+
+  # Gateway API filters reference:
+  # https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/#httproute-filters
+  #
+  # Examples you can uncomment and customize:
+  #
+  # filters:
+  #   # 1) Strip the external prefix so the app sees "/" instead of "/backend/luma-syncer"
+  #   - type: URLRewrite
+  #     urlRewrite:
+  #       path:
+  #         type: ReplacePrefixMatch
+  #         replacePrefixMatch: /
+  #
+  #   # 2) Add custom request headers
+  #   - type: RequestHeaderModifier
+  #     requestHeaderModifier:
+  #       add:
+  #         X-Env: "dev"
+  #         X-App: "luma-syncer"
+  #
+  #   # 3) NGINX Gateway Fabric extension (example CORS policy)
+  #   # - type: ExtensionRef
+  #   #   extensionRef:
+  #   #     group: gateway.nginx.org
+  #   #     kind: CORS
+  #   #     name: luma-syncer-cors
+  #
+  filters: []
 
