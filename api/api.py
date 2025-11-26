@@ -11,6 +11,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status, Path, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
 import yaml
@@ -73,6 +75,19 @@ async def lifespan(app: FastAPI):
         log_level = getattr(logging, get_logging_level().upper(), logging.INFO)
         logging.getLogger().setLevel(log_level)
         
+        # Add filter to suppress health check access logs
+        class HealthCheckFilter(logging.Filter):
+            def filter(self, record):
+                # Filter out health check access logs
+                message = record.getMessage()
+                return "/health" not in message and '"GET /health' not in message
+        
+        # Apply filter to uvicorn access logger
+        access_logger = logging.getLogger("uvicorn.access")
+        # Remove existing filters to avoid duplicates
+        access_logger.filters = [f for f in access_logger.filters if not isinstance(f, HealthCheckFilter)]
+        access_logger.addFilter(HealthCheckFilter())
+        
         # Log the active profile
         deployment_profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
         logger.info(f"Profile {deployment_profile} activated.")
@@ -127,6 +142,33 @@ app = FastAPI(
     redoc_url=None,  # Disabled - we add docs to router
     lifespan=lifespan
 )
+
+# Middleware to suppress access logs for health checks
+class SuppressHealthCheckLoggingMiddleware(BaseHTTPMiddleware):
+    """Middleware to suppress access logging for health check endpoints."""
+    
+    async def dispatch(self, request: StarletteRequest, call_next):
+        # Check if this is a health check request
+        is_health_check = request.url.path in ["/health", "/health/"]
+        
+        # If it's a health check, temporarily disable access logging
+        if is_health_check:
+            # Get the uvicorn access logger
+            access_logger = logging.getLogger("uvicorn.access")
+            original_level = access_logger.level
+            # Temporarily set to WARNING to suppress INFO logs
+            access_logger.setLevel(logging.WARNING)
+            try:
+                response = await call_next(request)
+                return response
+            finally:
+                # Restore original log level
+                access_logger.setLevel(original_level)
+        else:
+            return await call_next(request)
+
+# Add middleware to suppress health check logging (before CORS)
+app.add_middleware(SuppressHealthCheckLoggingMiddleware)
 
 # Enable CORS for API access
 app.add_middleware(
@@ -327,7 +369,22 @@ async def openapi():
 
 if __name__ == "__main__":
     import uvicorn
+    from uvicorn.config import LOGGING_CONFIG
+    
+    # Custom logging config to suppress health check access logs
+    log_config = LOGGING_CONFIG.copy()
+    
+    # Add a filter to the access logger to exclude health checks
+    class HealthCheckFilter(logging.Filter):
+        def filter(self, record):
+            # Filter out health check access logs
+            return "/health" not in record.getMessage()
+    
+    # Apply filter to uvicorn access logger
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.addFilter(HealthCheckFilter())
+    
     port = int(os.getenv("PORT", "5000"))
     host = os.getenv("HOST", "0.0.0.0")
     logger.info(f"Starting API server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, log_config=log_config)
