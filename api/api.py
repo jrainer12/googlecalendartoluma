@@ -10,15 +10,12 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status, Path, APIRouter, Request
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request as StarletteRequest
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
-import yaml
-from pathlib import Path as PathlibPath
 
-from app.util.config import config, get_logging_level, get_base_route_http
+from app.util.config import config, get_base_route_http
+from app.util.app_config import get_base_route_sync, setup_middleware
+from app.util.app_setup import setup_app
 from app.models.models import (
     HealthResponse,
     EventPayload,
@@ -39,87 +36,11 @@ logger = logging.getLogger(__name__)
 api_router = APIRouter()
 
 
-def get_base_route_sync() -> str:
-    """Get base route synchronously from environment variable, YAML file, or default.
-    Used for setting docs_url at app creation time before config loads."""
-    # Check environment variable first
-    env_value = os.getenv('APP_BASE_ROUTE_HTTP')
-    if env_value:
-        return env_value
-    
-    # Try to read from YAML file synchronously
-    try:
-        resources_path = PathlibPath(__file__).parent / "resources"
-        app_yaml = resources_path / "application.yaml"
-        if app_yaml.exists():
-            with open(app_yaml, 'r') as f:
-                yaml_data = yaml.safe_load(f) or {}
-                base_route = yaml_data.get('app', {}).get('base_route_http')
-                if base_route:
-                    return base_route
-    except Exception as e:
-        logger.debug(f"Could not read base_route from YAML synchronously: {e}")
-    
-    # Default fallback
-    return '/backend/luma-syncer'
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
-    # Startup - wrap in try/except to ensure app starts even if config fails
-    try:
-        await config.load_config()
-        
-        # Update logging level after config is loaded
-        log_level = getattr(logging, get_logging_level().upper(), logging.INFO)
-        logging.getLogger().setLevel(log_level)
-        
-        # Add filter to suppress health check access logs
-        class HealthCheckFilter(logging.Filter):
-            def filter(self, record):
-                # Filter out health check access logs
-                message = record.getMessage()
-                return "/health" not in message and '"GET /health' not in message
-        
-        # Apply filter to uvicorn access logger
-        access_logger = logging.getLogger("uvicorn.access")
-        # Remove existing filters to avoid duplicates
-        access_logger.filters = [f for f in access_logger.filters if not isinstance(f, HealthCheckFilter)]
-        access_logger.addFilter(HealthCheckFilter())
-        
-        # Log the active profile
-        deployment_profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
-        logger.info(f"Profile {deployment_profile} activated.")
-        
-        # Check if debug mode is enabled and log if so
-        debug_mode = config.get_bool("app.debug", False) or (log_level == logging.DEBUG)
-        if debug_mode:
-            logger.debug("Debug mode has been activated")
-        
-        # Get base route and mount the API router with prefix
-        base_route = get_base_route_http()
-        # Mount router with prefix - all routes will be under base_route
-        app.include_router(api_router, prefix=base_route)
-        
-        logger.info(f"Application started with logging level: {log_level}")
-        logger.info(f"API routes mounted at base path: {base_route}")
-        logger.info(f"Swagger docs available at: {base_route}/docs")
-        logger.info(f"ReDoc available at: {base_route}/redoc")
-    except Exception as e:
-        logger.error(f"Error during startup: {e}", exc_info=True)
-        # Still try to mount router with default base route
-        try:
-            base_route = os.getenv('APP_BASE_ROUTE_HTTP', '/backend/luma-syncer')
-            app.include_router(api_router, prefix=base_route)
-            logger.warning(f"Using default base route: {base_route}")
-        except Exception as e2:
-            logger.error(f"Failed to mount router: {e2}", exc_info=True)
-    
-    # Log all registered routes for debugging
-    routes = [f"{route.path} ({route.methods})" for route in app.routes if hasattr(route, 'path')]
-    logger.info(f"Registered routes: {routes}")
-    logger.info(f"Health endpoint available at: /health")
+    # Startup - setup application
+    await setup_app(app, api_router)
     
     yield  # Application is running
     
@@ -143,62 +64,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Middleware to suppress access logs for health checks
-class SuppressHealthCheckLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to suppress access logging for health check endpoints."""
-    
-    async def dispatch(self, request: StarletteRequest, call_next):
-        # Check if this is a health check request
-        is_health_check = request.url.path in ["/health", "/health/"]
-        
-        # If it's a health check, temporarily disable access logging
-        if is_health_check:
-            # Get the uvicorn access logger
-            access_logger = logging.getLogger("uvicorn.access")
-            original_level = access_logger.level
-            # Temporarily set to WARNING to suppress INFO logs
-            access_logger.setLevel(logging.WARNING)
-            try:
-                response = await call_next(request)
-                return response
-            finally:
-                # Restore original log level
-                access_logger.setLevel(original_level)
-        else:
-            return await call_next(request)
-
-# Add middleware to suppress health check logging (before CORS)
-app.add_middleware(SuppressHealthCheckLoggingMiddleware)
-
-# Enable CORS for API access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ---------- CONFIG ----------
-# Read from environment variables with fallback to defaults
-GCAL_EMBED_URL = os.getenv(
-    "GCAL_EMBED_URL",
-    "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
-)
-LUMA_CALENDAR_API_ID = os.getenv("LUMA_CALENDAR_API_ID", "cal-iPlAn4RA1wD1lDh")
-
-# Match your latest example exactly (change if you like)
-COVER_URL = os.getenv(
-    "COVER_URL",
-    "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
-)
-TINT_COLOR = os.getenv("TINT_COLOR", "#708967")
-FONT_TITLE = os.getenv("FONT_TITLE", "geist-mono")
-
-TIMEZONE_NAME = os.getenv("TIMEZONE_NAME", "America/New_York")
-LIMIT = int(os.getenv("LIMIT", "5"))
-OUT_DIR = os.getenv("OUT_DIR", "luma_payloads")
-# ----------------------------
+# Setup middleware (CORS, health check logging suppression)
+setup_middleware(app)
 
 
 # Health check endpoint function - will be registered at both root and router level
@@ -253,15 +120,19 @@ async def health_router():
 )
 async def get_events():
     """Get all upcoming events from Google Calendar"""
+    # Access config like Quart: config['events']['cover_url'] or config.get('events', {}).get('cover_url')
+    calendar_config = config.get('calendar', {})
+    events_config = config.get('events', {})
+    
     result = await fetch_events(
-        gcal_embed_url=GCAL_EMBED_URL,
-        luma_calendar_api_id=LUMA_CALENDAR_API_ID,
-        timezone_name=TIMEZONE_NAME,
-        limit=LIMIT,
-        cover_url=COVER_URL,
-        tint_color=TINT_COLOR,
-        font_title=FONT_TITLE,
-        out_dir=OUT_DIR
+        gcal_embed_url=calendar_config.get('gcal_embed_url', 'https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York'),
+        luma_calendar_api_id=calendar_config.get('luma_calendar_api_id', 'cal-iPlAn4RA1wD1lDh'),
+        timezone_name=events_config.get('timezone_name', 'America/New_York'),
+        limit=events_config.get('limit', 5),
+        cover_url=events_config.get('cover_url', 'https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60'),
+        tint_color=events_config.get('tint_color', '#708967'),
+        font_title=events_config.get('font_title', 'geist-mono'),
+        out_dir=events_config.get('out_dir', 'luma_payloads')
     )
     if not result["success"]:
         raise HTTPException(
@@ -281,15 +152,19 @@ async def get_events():
 )
 async def get_event(event_id: int = Path(..., ge=1, description="Event ID (1-indexed)")):
     """Get a specific event by ID"""
+    # Access config like Quart: config['events']['cover_url'] or config.get('events', {}).get('cover_url')
+    calendar_config = config.get('calendar', {})
+    events_config = config.get('events', {})
+    
     result = await fetch_events(
-        gcal_embed_url=GCAL_EMBED_URL,
-        luma_calendar_api_id=LUMA_CALENDAR_API_ID,
-        timezone_name=TIMEZONE_NAME,
-        limit=LIMIT,
-        cover_url=COVER_URL,
-        tint_color=TINT_COLOR,
-        font_title=FONT_TITLE,
-        out_dir=OUT_DIR
+        gcal_embed_url=calendar_config.get('gcal_embed_url', 'https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York'),
+        luma_calendar_api_id=calendar_config.get('luma_calendar_api_id', 'cal-iPlAn4RA1wD1lDh'),
+        timezone_name=events_config.get('timezone_name', 'America/New_York'),
+        limit=events_config.get('limit', 5),
+        cover_url=events_config.get('cover_url', 'https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60'),
+        tint_color=events_config.get('tint_color', '#708967'),
+        font_title=events_config.get('font_title', 'geist-mono'),
+        out_dir=events_config.get('out_dir', 'luma_payloads')
     )
     if not result["success"]:
         raise HTTPException(
@@ -369,22 +244,7 @@ async def openapi():
 
 if __name__ == "__main__":
     import uvicorn
-    from uvicorn.config import LOGGING_CONFIG
-    
-    # Custom logging config to suppress health check access logs
-    log_config = LOGGING_CONFIG.copy()
-    
-    # Add a filter to the access logger to exclude health checks
-    class HealthCheckFilter(logging.Filter):
-        def filter(self, record):
-            # Filter out health check access logs
-            return "/health" not in record.getMessage()
-    
-    # Apply filter to uvicorn access logger
-    access_logger = logging.getLogger("uvicorn.access")
-    access_logger.addFilter(HealthCheckFilter())
-    
     port = int(os.getenv("PORT", "5000"))
     host = os.getenv("HOST", "0.0.0.0")
     logger.info(f"Starting API server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_config=log_config)
+    uvicorn.run(app, host=host, port=port)
