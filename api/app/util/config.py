@@ -51,8 +51,8 @@ async def get_jwt_token() -> str:
 
 async def load_from_file(config: Dict[str, Any]) -> Dict[str, Any]:
     """Load configuration from resources/application.yaml and application-{profile}.yaml files."""
-    # Go up one level from util/ to api/ directory, then to resources/
-    base_dir = Path(__file__).parent.parent
+    # Go up from app/util/ to api/ directory, then to resources/
+    base_dir = Path(__file__).parent.parent.parent
     resources_dir = base_dir / "resources"
     
     # Load base application.yaml first
