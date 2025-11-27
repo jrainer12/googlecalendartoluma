@@ -51,8 +51,8 @@ async def get_jwt_token() -> str:
 
 async def load_from_file(config: Dict[str, Any]) -> Dict[str, Any]:
     """Load configuration from resources/application.yaml and application-{profile}.yaml files."""
-    # Go up one level from util/ to api/ directory, then to resources/
-    base_dir = Path(__file__).parent.parent
+    # Go up from app/util/ to api/ directory, then to resources/
+    base_dir = Path(__file__).parent.parent.parent
     resources_dir = base_dir / "resources"
     
     # Load base application.yaml first
@@ -110,12 +110,41 @@ async def load_from_spring_cloud_config(config: Dict[str, Any]) -> Dict[str, Any
 
 
 class AppConfig:
-    """Application configuration loaded from YAML files and Spring Cloud Config."""
+    """Application configuration loaded from YAML files and Spring Cloud Config.
+    
+    Supports dictionary-style access like Quart's app.config:
+        config['events']['cover_url']
+        config.get('events', {}).get('cover_url')
+    """
     
     def __init__(self):
         self._config: Dict[str, Any] = {}
         # Note: This is synchronous initialization, but actual loading happens in load_config()
         # For async loading, use load_config() separately after app startup
+    
+    def __getitem__(self, key: str) -> Any:
+        """Dictionary-style access: config['events']"""
+        return self._config[key]
+    
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists: 'events' in config"""
+        return key in self._config
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dictionary-style get method: config.get('events', {})"""
+        return self._config.get(key, default)
+    
+    def keys(self):
+        """Get all top-level keys"""
+        return self._config.keys()
+    
+    def items(self):
+        """Get all top-level items"""
+        return self._config.items()
+    
+    def values(self):
+        """Get all top-level values"""
+        return self._config.values()
     
     async def load_config(self):
         """Load configuration asynchronously from files and Spring Cloud Config."""
