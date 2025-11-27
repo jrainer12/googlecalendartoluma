@@ -46,7 +46,9 @@ jobs:
         with:
           modules: ${{ github.event.inputs.modules }}
           environments: ${{ github.event.inputs.environments }}
-          release_name: googlecalendartoluma-api
+          # Per-module Helm release names for workloads module_name:whatever you want release name to be
+          release_overrides: |
+            api:googlecalendartoluma-api
 
   Docker_Build:
     name: Docker Build ${{ matrix.module }}
