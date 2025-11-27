@@ -39,44 +39,16 @@ jobs:
     name: Prepare Matrix Json
     runs-on: ubuntu-latest
     outputs:
-      modules_json: ${{ steps.construct-modules-only-matrix.outputs.modules_json }}
-      matrix_json: ${{ steps.construct-json-matrix-for-modules.outputs.matrix_json }}
+      modules_json: ${{ steps.prepare.outputs.modules_json }}
+      matrix_json: ${{ steps.prepare.outputs.matrix_json }}
     steps:
-      - id: construct-modules-only-matrix
-        run: |
-          MODULES_JSON='{"include":['
-          IFS=',' read -ra MODULES <<< "${{ github.event.inputs.modules }}"
-          for module in "${MODULES[@]}"; do
-            MODULES_JSON+='{"module":"'"$module"'","module_lower":"'"$(echo $module | tr '[:upper:]' '[:lower:]')"'"},'
-          done
-          MODULES_JSON=${MODULES_JSON%,}
-          MODULES_JSON+=']}'
-          echo "Modules JSON: $MODULES_JSON"
-          echo "modules_json=$MODULES_JSON" >> $GITHUB_OUTPUT
-
-      - id: construct-json-matrix-for-modules
-        run: |
-          IFS=',' read -ra MODULES <<< "${{ github.event.inputs.modules }}"
-          IFS=',' read -ra ENVIRONMENTS <<< "${{ github.event.inputs.environments }}"
-
-          MATRIX_JSON="{\"include\": ["
-          for ENV in "${ENVIRONMENTS[@]}"; do
-            for MODULE in "${MODULES[@]}"; do
-              # Set release names for modules
-              if [[ "$MODULE" == "api" ]]; then
-                RELEASE_NAME='googlecalendartoluma-api'
-              elif [[ "$MODULE" == "cronjob" ]]; then
-                RELEASE_NAME='googlecalendartoluma-cron'
-              else
-                RELEASE_NAME="$MODULE"
-              fi
-
-              MATRIX_JSON+="{\"environment\": \"$ENV\", \"module\": \"$MODULE\", \"module_lower\": \"$(echo $MODULE | tr '[:upper:]' '[:lower:]')\", \"releaseName\": \"$RELEASE_NAME\"},"
-            done
-          done
-          MATRIX_JSON="${MATRIX_JSON%,}]}"
-          echo "MATRIX_JSON=$MATRIX_JSON"
-          echo "matrix_json=$MATRIX_JSON" >> $GITHUB_OUTPUT
+      - name: Prepare matrix JSON
+        id: prepare
+        uses: jrainer12/Reusable_GitHub_Actions/.github/actions/prepare-matrix-json@main
+        with:
+          modules: ${{ github.event.inputs.modules }}
+          environments: ${{ github.event.inputs.environments }}
+          release_name: googlecalendartoluma-api
 
   Docker_Build:
     name: Docker Build ${{ matrix.module }}
