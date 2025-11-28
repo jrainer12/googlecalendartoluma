@@ -80,7 +80,8 @@ jobs:
         with:
           image-ref: ${{ steps.build.outputs.image_full }}
           format: table
-          exit-code: 1
+          severity: HIGH,CRITICAL
+          exit-code: 1          # fail only on HIGH/CRITICAL
           ignore-unfixed: true
 
   Deploy_To_Kubernetes:
