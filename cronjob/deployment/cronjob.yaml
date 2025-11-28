@@ -17,10 +17,12 @@ spec:
             app: googlecalendartoluma-cron
         spec:
           restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-login
           containers:
             - name: googlecalendartoluma-cron
               image: googlecalendartoluma-cron:latest
-              imagePullPolicy: Never
+              imagePullPolicy: Always
               env:
                 - name: GCAL_EMBED_URL
                   valueFrom:
