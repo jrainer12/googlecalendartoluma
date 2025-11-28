@@ -32,9 +32,7 @@ jobs:
         id: prepare
         uses: jrainer12/Reusable_GitHub_Actions/.github/actions/prepare-matrix-json@main
         with:
-          # Always build the hardcoded modules for this pipeline
           modules: ${{ env.MODULES }}
-          # Dummy environment just to satisfy the action input
           environments: daily
           release_overrides: ""
 
