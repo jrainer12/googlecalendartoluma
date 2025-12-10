@@ -118,6 +118,17 @@ jobs:
           kubeconfig_data: ${{ secrets.KUBECONFIG }}
           # context_name: my-context
 
+      # Create GHCR imagePullSecret for API module
+      - name: Create GHCR imagePullSecret
+        if: matrix.module == 'api'
+        run: |
+          kubectl create secret docker-registry ghcr-login \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --namespace=${{ env.K8S_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       # Deploy API module with Helm (using releaseName from matrix)
       - name: Deploy API with Helm
         if: matrix.module == 'api'
