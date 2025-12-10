@@ -99,6 +99,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout Helm Chart repository
+        if: matrix.module == 'api'
+        uses: actions/checkout@v4
+        with:
+          repository: jrainer12/Reusable_Helm_Chart
+          path: helm-chart
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
@@ -116,13 +123,13 @@ jobs:
         if: matrix.module == 'api'
         uses: jrainer12/Reusable_GitHub_Actions/.github/actions/deploy-helm-release@main
         with:
-          chart_path: ./api/helm/googlecalendartoluma
+          chart_path: ./helm-chart
           release_name: ${{ matrix.releaseName }}
           namespace: ${{ env.K8S_NAMESPACE }}
           environment: ${{ matrix.environment }}
           image_repository: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}
           image_tag: ${{ github.run_id }}
-          values_file_base: values.yaml
+          values_file_base: ./api/values/values.yaml
 
       # Deploy CronJob module with kubectl + YAML
       - name: Deploy CronJob with manifest
