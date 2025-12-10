@@ -129,7 +129,7 @@ jobs:
           environment: ${{ matrix.environment }}
           image_repository: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}
           image_tag: ${{ github.run_id }}
-          values_file_base: ./api/values/values.yaml
+          values_file_base: ${{ github.workspace }}/api/values/values.yaml
 
       # Deploy CronJob module with kubectl + YAML
       - name: Deploy CronJob with manifest
