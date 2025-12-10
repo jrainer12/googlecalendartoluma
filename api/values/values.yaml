@@ -137,4 +137,3 @@ gateway:
   #   #     name: luma-syncer-cors
   #
   filters: []
-

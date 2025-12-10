@@ -121,5 +121,3 @@ gateway:
 #    - hosts:
 #        - rainercloud.com
 #      secretName: rainercloud-tls
-
-

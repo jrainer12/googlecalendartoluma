@@ -99,6 +99,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout Helm Chart repository
+        if: matrix.module == 'api'
+        uses: actions/checkout@v4
+        with:
+          repository: jrainer12/Reusable_Helm_Chart
+          path: helm-chart
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
@@ -111,12 +118,23 @@ jobs:
           kubeconfig_data: ${{ secrets.KUBECONFIG }}
           # context_name: my-context
 
+      # Copy environment-specific values file to helm chart directory
+      - name: Prepare values files for Helm
+        if: matrix.module == 'api'
+        run: |
+          # Copy base values file
+          cp ./api/values/values.yaml ./helm-chart/values.yaml
+          # Copy environment-specific values file if it exists
+          if [[ -f "./api/values/values-${{ matrix.environment }}.yaml" ]]; then
+            cp "./api/values/values-${{ matrix.environment }}.yaml" "./helm-chart/values-${{ matrix.environment }}.yaml"
+          fi
+
       # Deploy API module with Helm (using releaseName from matrix)
       - name: Deploy API with Helm
         if: matrix.module == 'api'
         uses: jrainer12/Reusable_GitHub_Actions/.github/actions/deploy-helm-release@main
         with:
-          chart_path: ./api/helm/googlecalendartoluma
+          chart_path: ./helm-chart
           release_name: ${{ matrix.releaseName }}
           namespace: ${{ env.K8S_NAMESPACE }}
           environment: ${{ matrix.environment }}
