@@ -118,6 +118,17 @@ jobs:
           kubeconfig_data: ${{ secrets.KUBECONFIG }}
           # context_name: my-context
 
+      # Copy environment-specific values file to helm chart directory
+      - name: Prepare values files for Helm
+        if: matrix.module == 'api'
+        run: |
+          # Copy base values file
+          cp ../api/values/values.yaml ./helm-chart/values.yaml
+          # Copy environment-specific values file if it exists
+          if [[ -f "../api/values/values-${{ matrix.environment }}.yaml" ]]; then
+            cp "../api/values/values-${{ matrix.environment }}.yaml" "./helm-chart/values-${{ matrix.environment }}.yaml"
+          fi
+
       # Deploy API module with Helm (using releaseName from matrix)
       - name: Deploy API with Helm
         if: matrix.module == 'api'
@@ -129,7 +140,7 @@ jobs:
           environment: ${{ matrix.environment }}
           image_repository: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.module_lower }}
           image_tag: ${{ github.run_id }}
-          values_file_base: ../api/values/values.yaml
+          values_file_base: values.yaml
 
       # Deploy CronJob module with kubectl + YAML
       - name: Deploy CronJob with manifest
