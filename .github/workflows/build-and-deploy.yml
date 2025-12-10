@@ -123,10 +123,10 @@ jobs:
         if: matrix.module == 'api'
         run: |
           # Copy base values file
-          cp ../api/values/values.yaml ./helm-chart/values.yaml
+          cp ./api/values/values.yaml ./helm-chart/values.yaml
           # Copy environment-specific values file if it exists
-          if [[ -f "../api/values/values-${{ matrix.environment }}.yaml" ]]; then
-            cp "../api/values/values-${{ matrix.environment }}.yaml" "./helm-chart/values-${{ matrix.environment }}.yaml"
+          if [[ -f "./api/values/values-${{ matrix.environment }}.yaml" ]]; then
+            cp "./api/values/values-${{ matrix.environment }}.yaml" "./helm-chart/values-${{ matrix.environment }}.yaml"
           fi
 
       # Deploy API module with Helm (using releaseName from matrix)
