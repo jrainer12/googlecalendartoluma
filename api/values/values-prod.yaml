@@ -14,24 +14,28 @@ config:
 # Environment variables for production
 # These can reference secrets or ConfigMaps
 env:
-  DEPLOYMENT_PROFILE: "prod"
+  - name: DEPLOYMENT_PROFILE
+    value: "prod"
   # Example Spring Cloud Config (uncomment and configure as needed):
-  # SPRING_TENANT:
+  # - name: SPRING_TENANT
   #   valueFrom:
   #     secretKeyRef:
   #       name: spring-cloud-config
   #       key: TENANT
-  # SPRING_CLIENT_ID:
+  #
+  # - name: SPRING_CLIENT_ID
   #   valueFrom:
   #     secretKeyRef:
   #       name: spring-cloud-config
   #       key: CLIENT_ID
-  # SPRING_CLIENT_SECRET:
+  #
+  # - name: SPRING_CLIENT_SECRET
   #   valueFrom:
   #     secretKeyRef:
   #       name: spring-cloud-config
   #       key: CLIENT_SECRET
-  # SPRING_SCOPE:
+  #
+  # - name: SPRING_SCOPE
   #   valueFrom:
   #     secretKeyRef:
   #       name: spring-cloud-config
