@@ -25,18 +25,46 @@ REST API microservice that exposes Google Calendar events as Luma-compatible JSO
 
 ## Configuration
 
-The API can be configured using environment variables:
+The API can be configured using:
 
-- `GCAL_EMBED_URL` - Google Calendar embed URL (required)
-- `LUMA_CALENDAR_API_ID` - Luma calendar API ID (required)
-- `COVER_URL` - Cover image URL for events
-- `TINT_COLOR` - Color tint for events (hex format)
-- `FONT_TITLE` - Font family for event titles
-- `TIMEZONE_NAME` - Timezone for event processing (default: America/New_York)
-- `LIMIT` - Maximum number of events to process (default: 5)
-- `OUT_DIR` - Output directory for JSON files (default: luma_payloads)
-- `PORT` - API server port (default: 5000)
-- `HOST` - API server host (default: 0.0.0.0)
+1. **YAML configuration files** in `resources/` directory:
+   - `resources/application.yaml` - Base configuration
+   - `resources/application-prod.yaml` - Production overrides
+
+2. **Environment variables** (override YAML config):
+   - `GCAL_EMBED_URL` - Google Calendar embed URL
+   - `LUMA_CALENDAR_API_ID` - Luma calendar API ID
+   - `COVER_URL` - Cover image URL for events
+   - `TINT_COLOR` - Color tint for events (hex format)
+   - `FONT_TITLE` - Font family for event titles
+   - `TIMEZONE_NAME` - Timezone for event processing (default: America/New_York)
+   - `LIMIT` - Maximum number of events to process (default: 5)
+   - `OUT_DIR` - Output directory for JSON files (default: luma_payloads)
+   - `PORT` - API server port (default: 5000)
+   - `HOST` - API server host (default: 0.0.0.0)
+   - `DEPLOYMENT_PROFILE` - Deployment profile (default: dev, used to load `application-{profile}.yaml`)
+
+### Spring Cloud Config
+
+The API supports loading configuration from Spring Cloud Config Server. Configure in `resources/application.yaml` or `resources/application-prod.yaml`:
+
+```yaml
+app:
+  enable_spring_config: true  # Set to true to enable Spring Cloud Config
+  spring_cloud_config_name: "api-google-calendar-to-luma"
+  spring_cloud_config_auth_type: "jwt"  # Options: "jwt" or "basic"
+  spring_cloud_config_service_url: "http://spring-cloud-config-generic-api:8888/backend/spring-cloud-config-server"
+```
+
+**For JWT authentication**, set these environment variables:
+- `SPRING_TENANT` - Azure AD tenant ID
+- `SPRING_CLIENT_ID` - Azure AD client ID
+- `SPRING_CLIENT_SECRET` - Azure AD client secret
+- `SPRING_SCOPE` - OAuth2 scope
+
+**For Basic authentication**, set these environment variables:
+- `SPRING_CONFIG_USERNAME` - Basic auth username
+- `SPRING_CONFIG_PASSWORD` - Basic auth password
 
 ## Local Development
 
@@ -176,7 +204,7 @@ minikube image ls | grep googlecalendartoluma-api
 
 3. **Update configuration** for your environment:
 
-**For Production/Default** - Edit `helm/googlecalendartoluma/values.yaml`:
+**For Production/Default** - Edit `values/values.yaml`:
 ```yaml
 config:
   gcalEmbedUrl: "your_google_calendar_embed_url"
@@ -185,26 +213,31 @@ config:
   limit: 5
 ```
 
-**For Development** - Edit `helm/googlecalendartoluma/values-dev.yaml`:
+**For Production** - Edit `values/values-prod.yaml`:
 ```yaml
 config:
   gcalEmbedUrl: "your_google_calendar_embed_url"
   lumaCalendarApiId: "your_luma_calendar_api_id"
   timezoneName: "America/New_York"
-  limit: 3
+  limit: 5
 ```
 
 4. **Install with Helm**:
 
-**For Production/Default** (uses `values.yaml`):
+The Helm chart is maintained in a separate repository: [Reusable_Helm_Chart](https://github.com/jrainer12/Reusable_Helm_Chart)
+
+**For Production** (uses `values/values-prod.yaml`):
 ```bash
-helm install googlecalendartoluma ./helm/googlecalendartoluma
+# Clone or reference the helm chart repo
+helm install googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml
 ```
 
-**For Development** (uses `values-dev.yaml`):
+**For Development** (uses `values/values.yaml`):
 ```bash
-helm install googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml
+helm install googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml
 ```
 
 5. **Wait for deployment** and check status:
@@ -286,26 +319,30 @@ curl http://localhost:8080/
 
 ## Updating Configuration
 
-**For Production/Default:**
+**For Production:**
 ```bash
-# Edit values.yaml, then upgrade
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
+# Edit values/values.yaml and values/values-prod.yaml, then upgrade
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml
 
 # Or override values directly
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml \
   --set config.limit=10 \
   --set config.timezoneName="America/Los_Angeles"
 ```
 
 **For Development:**
 ```bash
-# Edit values-dev.yaml, then upgrade with dev values
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml
+# Edit values/values.yaml, then upgrade
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml
 
 # Or override values directly
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml \
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
   --set config.limit=10
 ```
 
@@ -327,11 +364,11 @@ helm uninstall googlecalendartoluma
 
 ## Enable/Disable Horizontal Pod Autoscaler (HPA)
 
-**For Production** - Edit `helm/googlecalendartoluma/values.yaml`:
+**For Production** - Edit `values/values-prod.yaml`:
 ```yaml
 autoscaling:
   enabled: true  # Set to true to enable HPA
-  minReplicas: 1
+  minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
@@ -339,10 +376,12 @@ autoscaling:
 
 Then upgrade:
 ```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml
 ```
 
-**For Development** - Edit `helm/googlecalendartoluma/values-dev.yaml` (autoscaling is disabled by default):
+**For Development** - Edit `values/values.yaml` (autoscaling can be disabled):
 ```yaml
 autoscaling:
   enabled: false  # Disabled in dev
@@ -350,21 +389,23 @@ autoscaling:
 
 Then upgrade:
 ```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml
 ```
 
 **Or enable via command line:**
 ```bash
 # Production
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml \
   --set autoscaling.enabled=true \
   --set autoscaling.minReplicas=2 \
   --set autoscaling.maxReplicas=5
 
 # Development
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml \
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
   --set autoscaling.enabled=true
 ```
 
@@ -376,7 +417,7 @@ kubectl describe hpa googlecalendartoluma-api
 
 ## Enable Ingress (for external access)
 
-**For Production** - Edit `helm/googlecalendartoluma/values.yaml`:
+**For Production** - Edit `values/values-prod.yaml`:
 ```yaml
 ingress:
   enabled: true
@@ -395,10 +436,12 @@ ingress:
 
 Then upgrade:
 ```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml
 ```
 
-**For Development** - Edit `helm/googlecalendartoluma/values-dev.yaml`:
+**For Development** - Edit `values/values.yaml`:
 ```yaml
 ingress:
   enabled: true
@@ -412,47 +455,79 @@ ingress:
 
 Then upgrade:
 ```bash
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml
 ```
 
 ## Environment-Specific Values
 
 The Helm chart supports environment-specific configuration:
 
-- **`values.yaml`** - Default/production values (used by default)
-- **`values-dev.yaml`** - Development environment overrides
+- **`values/values.yaml`** - Base/default values
+- **`values/values-prod.yaml`** - Production environment overrides
 
 **Always specify the environment when installing or upgrading:**
 
 ```bash
-# Production/Default (uses values.yaml)
-helm install googlecalendartoluma ./helm/googlecalendartoluma
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma
+# Production (uses values.yaml + values-prod.yaml)
+helm install googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml
 
-# Development (uses values-dev.yaml)
-helm install googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml
-helm upgrade googlecalendartoluma ./helm/googlecalendartoluma \
-  -f ./helm/googlecalendartoluma/values-dev.yaml
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml \
+  -f ./values/values-prod.yaml
+
+# Development (uses values.yaml only)
+helm install googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml
+
+helm upgrade googlecalendartoluma ./path-to-helm-chart \
+  -f ./values/values.yaml
 ```
 
-**The `values-dev.yaml` file overrides:**
-- Image tag: `dev` (instead of `latest`)
-- Event limit: `3` (instead of `5`)
-- Autoscaling: `disabled` (instead of `enabled`)
+**The `values-prod.yaml` file typically overrides:**
+- Image pull secrets for GHCR
+- Autoscaling settings
+- Gateway/Ingress configuration
+- Environment-specific config values
 
-**Note:** `values-dev.yaml` only contains differences from `values.yaml`. Helm merges them, so you only need to specify what's different for your environment.
+**Note:** `values-prod.yaml` only contains differences from `values.yaml`. Helm merges them, so you only need to specify what's different for your environment.
+
+## Project Structure
+
+```
+api/
+├── api.py                    # FastAPI application entry point
+├── app/                      # Application code
+│   ├── models/              # Data models
+│   ├── services/            # Business logic services
+│   └── util/                # Utilities (config, setup)
+├── resources/                # Application configuration YAML files
+│   ├── application.yaml     # Base configuration
+│   └── application-prod.yaml # Production overrides
+├── values/                   # Helm values files
+│   ├── values.yaml          # Base Helm values
+│   └── values-prod.yaml     # Production Helm values
+├── Dockerfile               # Container image definition
+├── docker-compose.yml       # Local development setup
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
+```
+
+**Note:** The Helm chart is maintained in a separate repository: [Reusable_Helm_Chart](https://github.com/jrainer12/Reusable_Helm_Chart)
 
 ## For Production
 
-- Push the image to a container registry
-- Update `values.yaml` to use the registry image
+- Push the image to a container registry (GHCR, Docker Hub, etc.)
+- Update `values/values.yaml` to use the registry image
 - Change `image.pullPolicy` to `Always` or `IfNotPresent`
+- Configure `imagePullSecrets` in `values/values-prod.yaml` for private registries
 - Consider using Secrets for sensitive configuration
-- Enable Ingress for external access
+- Enable Gateway/Ingress for external access
 - Configure HPA for automatic scaling
 - Set appropriate resource limits and requests
+- Configure Spring Cloud Config if needed (see Configuration section)
 
 ## Cleanup
 

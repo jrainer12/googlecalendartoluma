@@ -7,11 +7,20 @@ Syncs upcoming events from a Google Calendar to Luma event payloads. This projec
 ```
 googlecalendartoluma/
 ├── api/                    # REST API microservice
-│   ├── api.py             # Flask API application
+│   ├── api.py             # FastAPI application
+│   ├── app/               # Application code
+│   │   ├── models/        # Data models
+│   │   ├── services/      # Business logic services
+│   │   └── util/          # Utilities (config, setup)
+│   ├── resources/         # Application configuration YAML files
+│   │   ├── application.yaml
+│   │   └── application-prod.yaml
+│   ├── values/            # Helm values files
+│   │   ├── values.yaml
+│   │   └── values-prod.yaml
 │   ├── Dockerfile         # Container image for API
 │   ├── docker-compose.yml # Local API deployment
 │   ├── requirements.txt   # Python dependencies
-│   ├── helm/              # Kubernetes Helm chart
 │   └── README.md          # API module documentation
 │
 ├── cronjob/               # Scheduled job script
@@ -22,8 +31,13 @@ googlecalendartoluma/
 │   ├── deployment/       # Kubernetes CronJob manifests
 │   └── README.md         # CronJob module documentation
 │
+├── .github/              # GitHub Actions workflows
+│   └── workflows/       # CI/CD pipeline definitions
+│
 └── README.md             # This file (overview)
 ```
+
+**Note:** The Helm chart is maintained in a separate repository: [Reusable_Helm_Chart](https://github.com/jrainer12/Reusable_Helm_Chart)
 
 ## Features
 
@@ -143,6 +157,9 @@ ls luma_payloads/
 
 ### API Module (Kubernetes)
 
+The Helm chart is maintained in a separate repository. For Kubernetes deployment, see the [API README](api/README.md) for detailed instructions.
+
+**Quick deployment:**
 ```bash
 cd api
 # Build and load image
@@ -150,15 +167,8 @@ podman build -t googlecalendartoluma-api:latest .
 podman save googlecalendartoluma-api:latest -o api.tar
 minikube image load api.tar
 
-# Deploy with Helm (Production - uses values.yaml)
-helm install googlecalendartoluma ./helm/googlecalendartoluma
-
-# OR Deploy for Development (uses values-dev.yaml)
-# helm install googlecalendartoluma ./helm/googlecalendartoluma \
-#   -f ./helm/googlecalendartoluma/values-dev.yaml
-
-# Access via port-forward
-kubectl port-forward svc/googlecalendartoluma-api 8080:80
+# Deploy with Helm (uses external chart from Reusable_Helm_Chart repo)
+# See api/README.md for full deployment instructions
 ```
 
 ### CronJob Module (Kubernetes)
