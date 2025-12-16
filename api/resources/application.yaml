@@ -1,13 +1,17 @@
 app:
   base_route_http: "/backend/luma-syncer"
-calendar:
-  gcal_embed_url: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
-  luma_calendar_api_id: "cal-iPlAn4RA1wD1lDh"
-events:
-  cover_url: "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
-  tint_color: "#708967"
-  font_title: "geist-mono"
-  timezone_name: "America/New_York"
-  limit: 5
-  out_dir: "luma_payloads"
+  enable_spring_config: false
+  spring_cloud_config_name: "api-google-calendar-to-luma"
+  spring_cloud_config_auth_type: "jwt"  # Options: "jwt" or "basic"
+  spring_cloud_config_service_url: "http://spring-cloud-config-generic-api:8888/backend/spring-cloud-config-server"
+#calendar:
+#  gcal_embed_url: "https://calendar.google.com/calendar/embed?src=tnti8oguf84qd354budk86vdpk%40group.calendar.google.com&ctz=America%2FNew_York"
+#  luma_calendar_api_id: "cal-iPlAn4RA1wD1lDh"
+#events:
+#  cover_url: "https://images.lumacdn.com/gallery-images/vn/e95edc2d-7ad2-45a0-ba4c-393e17cb8f60"
+#  tint_color: "#708967"
+#  font_title: "geist-mono"
+#  timezone_name: "America/New_York"
+#  limit: 5
+#  out_dir: "luma_payloads"
 

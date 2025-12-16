@@ -1,6 +1,8 @@
 app:
   logging_level: "INFO"
   debug: false
-  enable_spring_config: false
+  enable_spring_config: true
   spring_cloud_config_name: "api-google-calendar-to-luma"
+  spring_cloud_config_auth_type: "basic"  # Options: "jwt" or "basic"
+  spring_cloud_config_service_url: "http://spring-cloud-config-generic-api:8888/backend/spring-cloud-config-server"
 

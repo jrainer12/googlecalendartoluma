@@ -9,7 +9,7 @@ import logging
 import httpx
 import aiofiles
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ async def get_jwt_token() -> str:
     scope = os.getenv('SPRING_SCOPE')
 
     if not all([tenant, client_id, client_secret, scope]):
-        raise ValueError("Missing required Spring Cloud Config credentials")
+        raise ValueError("Missing required Spring Cloud Config JWT credentials")
 
     url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
     data = {
@@ -47,6 +47,17 @@ async def get_jwt_token() -> str:
         response.raise_for_status()
         response_json = response.json()
         return response_json['access_token']
+
+
+def get_basic_auth_credentials() -> Tuple[str, str]:
+    """Get basic auth credentials for Spring Cloud Config authentication."""
+    username = os.getenv('SPRING_CONFIG_USERNAME')
+    password = os.getenv('SPRING_CONFIG_PASSWORD')
+    
+    if not username or not password:
+        raise ValueError("Missing required Spring Cloud Config basic auth credentials")
+    
+    return (username, password)
 
 
 async def load_from_file(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -91,18 +102,34 @@ async def load_from_spring_cloud_config(config: Dict[str, Any]) -> Dict[str, Any
         return config
     
     try:
-        jwt_token = await get_jwt_token()
-        app_name = config['app']['spring_cloud_config_name']
+        app_config = config.get('app', {})
+        app_name = app_config.get('spring_cloud_config_name', 'api-google-calendar-to-luma')
         profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
-        sccs_url = f"http://spring-cloud-config:8888/backend/spring-cloud-config/{app_name}-{profile}.yml"
+        auth_type = app_config.get('spring_cloud_config_auth_type', 'jwt').lower()
+        service_url = app_config.get('spring_cloud_config_service_url', 'http://spring-cloud-config-generic-api:8888/backend/spring-cloud-config-server')
+        sccs_url = f"{service_url}/{app_name}-{profile}.yml"
+        
+        # Prepare authentication headers
+        headers = {}
+        if auth_type == 'jwt':
+            jwt_token = await get_jwt_token()
+            headers["Authorization"] = f"Bearer {jwt_token}"
+            logger.debug("Using JWT authentication for Spring Cloud Config")
+        elif auth_type == 'basic':
+            username, password = get_basic_auth_credentials()
+            import base64
+            credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+            headers["Authorization"] = f"Basic {credentials}"
+            logger.debug("Using Basic authentication for Spring Cloud Config")
+        else:
+            raise ValueError(f"Unsupported auth type: {auth_type}. Must be 'jwt' or 'basic'")
         
         async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {jwt_token}"}
             response = await client.get(sccs_url, headers=headers)
             response.raise_for_status()
             spring_cfg = yaml.safe_load(response.text) or {}
             deep_merge(config, spring_cfg)
-            logger.info(f"Loaded configuration from Spring Cloud Config: {sccs_url}")
+            logger.info(f"Loaded configuration from Spring Cloud Config: {sccs_url} (auth: {auth_type})")
     except Exception as e:
         logger.error(f"Failed to load config from Spring Cloud Config: {e}")
     
