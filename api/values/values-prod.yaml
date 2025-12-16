@@ -16,30 +16,16 @@ config:
 env:
   - name: DEPLOYMENT_PROFILE
     value: "prod"
-  # Example Spring Cloud Config (uncomment and configure as needed):
-  # - name: SPRING_TENANT
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: spring-cloud-config
-  #       key: TENANT
-  #
-  # - name: SPRING_CLIENT_ID
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: spring-cloud-config
-  #       key: CLIENT_ID
-  #
-  # - name: SPRING_CLIENT_SECRET
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: spring-cloud-config
-  #       key: CLIENT_SECRET
-  #
-  # - name: SPRING_SCOPE
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: spring-cloud-config
-  #       key: SCOPE
+  - name: SPRING_CONFIG_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: spring-cloud-config
+        key: CONFIG_SERVER_USERNAME
+  - name: SPRING_CONFIG_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: spring-cloud-config
+        key: CONFIG_SERVER_PASSWORD
 
 autoscaling:
   enabled: true
