@@ -92,6 +92,81 @@ python api.py
 - All events: `http://localhost:5000/events`
 - Specific event: `http://localhost:5000/events/1`
 
+## Running Tests
+
+The project includes unit tests with coverage reporting. Tests are automatically run in CI and will fail if coverage drops below 80%.
+
+### Prerequisites
+
+Tests require the same dependencies as the application. Make sure you've installed them:
+```bash
+pip install -r requirements.txt
+```
+
+### Running Tests Locally
+
+**Run all tests:**
+```bash
+cd api
+pytest
+```
+
+**Run tests with verbose output:**
+```bash
+pytest -v
+```
+
+**Run tests for a specific file:**
+```bash
+pytest tests/test_payloadbuilder.py
+```
+
+**Run a specific test:**
+```bash
+pytest tests/test_payloadbuilder.py::TestToDt::test_datetime_with_timezone
+```
+
+### Coverage Reports
+
+**View coverage report in terminal:**
+```bash
+pytest
+# Coverage summary is displayed at the end
+```
+
+**Generate HTML coverage report:**
+```bash
+pytest
+# HTML report is generated in htmlcov/
+# Open htmlcov/index.html in your browser
+```
+
+**Generate XML coverage report (for CI):**
+```bash
+pytest
+# XML report is generated as coverage.xml
+```
+
+**View coverage with missing lines:**
+```bash
+pytest --cov-report=term-missing
+```
+
+### Test Configuration
+
+- Test files are located in `tests/` directory
+- Coverage threshold: **80% minimum** (configured in `pytest.ini`)
+- Coverage reports: HTML (`htmlcov/`), XML (`coverage.xml`), and terminal output
+- Test results: JUnit XML (`junit.xml`) for CI integration
+
+### CI Integration
+
+Tests run automatically in GitHub Actions on every workflow run:
+- Tests must pass
+- Coverage must be ≥ 80% or the build fails
+- Coverage reports are uploaded to Codecov
+- Test results are published as artifacts
+
 ## Container Deployment
 
 ### Using Podman (Recommended)
