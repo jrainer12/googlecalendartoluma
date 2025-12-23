@@ -82,13 +82,14 @@ jobs:
           pytest
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         if: always()
         with:
-          file: ./${{ matrix.module }}/coverage.xml
+          files: ./${{ matrix.module }}/coverage.xml
           flags: ${{ matrix.module }}
           name: codecov-${{ matrix.module }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false
+          verbose: true
 
       - name: Upload coverage to artifacts
         uses: actions/upload-artifact@v4
