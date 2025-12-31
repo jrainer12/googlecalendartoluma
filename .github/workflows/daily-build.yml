@@ -3,6 +3,8 @@ name: Daily Build
 permissions:
   contents: read
   packages: write
+  checks: write
+  pull-requests: read
 
 on:
   schedule:
@@ -36,6 +38,26 @@ jobs:
           modules: ${{ env.MODULES }}
           environments: daily
           release_overrides: ""
+
+  Test:
+    name: Run Unit Tests ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    needs: Prepare_Data
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.Prepare_Data.outputs.modules_json) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Python Tests
+        uses: jrainer12/Reusable_GitHub_Actions/.github/actions/run-python-pytests@main
+        with:
+          module_path: ${{ matrix.module }}
+          python_version: '3.13'
+          check_name: Unit Test Results (${{ matrix.module }})
+          codecov_flags: ${{ matrix.module }}
+          codecov_name: codecov-${{ matrix.module }}
 
   Docker_Build:
     name: Build ${{ matrix.module }}
@@ -87,7 +109,7 @@ jobs:
   Summary:
     name: Build Summary
     runs-on: ubuntu-latest
-    needs: [Prepare_Data, Docker_Build]
+    needs: [Prepare_Data, Test, Docker_Build]
     if: always()
     steps:
       - name: Print build summary

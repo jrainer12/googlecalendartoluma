@@ -4,6 +4,8 @@ permissions:
   contents: read
   packages: write
   id-token: write
+  checks: write
+  pull-requests: read
 
 on:
   workflow_dispatch:
@@ -50,6 +52,26 @@ jobs:
           release_overrides: |
             api:googlecalendartoluma-api
 
+  Test:
+    name: Run Unit Tests ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    needs: Prepare_Data
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.Prepare_Data.outputs.modules_json) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Python Tests
+        uses: jrainer12/Reusable_GitHub_Actions/.github/actions/run-python-pytests@main
+        with:
+          module_path: ${{ matrix.module }}
+          python_version: '3.13'
+          check_name: Unit Test Results (${{ matrix.module }})
+          codecov_flags: ${{ matrix.module }}
+          codecov_name: codecov-${{ matrix.module }}
+
   Docker_Build:
     name: Docker Build ${{ matrix.module }}
     runs-on: ubuntu-latest
@@ -87,7 +109,8 @@ jobs:
   Deploy_To_Kubernetes:
     name: Deploy ${{ matrix.module }} to ${{ matrix.environment }}
     runs-on: ubuntu-latest
-    needs: [Prepare_Data, Docker_Build]
+    needs: [Prepare_Data, Docker_Build, Test]
+    if: needs.Test.result == 'success'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.Prepare_Data.outputs.matrix_json) }}
@@ -156,7 +179,7 @@ jobs:
   Summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [Prepare_Data, Docker_Build, Deploy_To_Kubernetes]
+    needs: [Test, Prepare_Data, Docker_Build, Deploy_To_Kubernetes]
     if: always()
     steps:
       - name: Print deployment summary
