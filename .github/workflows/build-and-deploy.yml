@@ -63,52 +63,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Run Python Tests
+        uses: jrainer12/Reusable_GitHub_Actions/.github/actions/run-python-pytests@main
         with:
-          python-version: '3.13'
-          cache: 'pip'
-          cache-dependency-path: ${{ matrix.module }}/requirements.txt
-
-      - name: Install dependencies
-        run: |
-          cd ${{ matrix.module }}
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests with coverage
-        id: test
-        working-directory: ${{ matrix.module }}
-        run: |
-          # pytest will fail if coverage < 80% due to --cov-fail-under=80
-          pytest
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: ./${{ matrix.module }}/coverage.xml
-          flags: ${{ matrix.module }}
-          name: codecov-${{ matrix.module }}
-          fail_ci_if_error: false
-          verbose: true
-
-      - name: Upload coverage to artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report-${{ matrix.module }}
-          path: |
-            ${{ matrix.module }}/coverage.xml
-            ${{ matrix.module }}/htmlcov/
-            ${{ matrix.module }}/junit.xml
-      
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          files: ${{ matrix.module }}/junit.xml
+          module_path: ${{ matrix.module }}
+          python_version: '3.13'
           check_name: Unit Test Results (${{ matrix.module }})
+          codecov_flags: ${{ matrix.module }}
+          codecov_name: codecov-${{ matrix.module }}
 
   Docker_Build:
     name: Docker Build ${{ matrix.module }}
