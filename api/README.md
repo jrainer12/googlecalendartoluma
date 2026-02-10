@@ -40,9 +40,14 @@ The API can be configured using:
    - `TIMEZONE_NAME` - Timezone for event processing (default: America/New_York)
    - `LIMIT` - Maximum number of events to process (default: 5)
    - `OUT_DIR` - Output directory for JSON files (default: luma_payloads)
-   - `PORT` - API server port (default: 5000)
-   - `HOST` - API server host (default: 0.0.0.0)
-   - `DEPLOYMENT_PROFILE` - Deployment profile (default: dev, used to load `application-{profile}.yaml`)
+  - `PORT` - API server port (default: 5000)
+  - `HOST` - API server host (default: 0.0.0.0)
+  - `DEPLOYMENT_PROFILE` - Deployment profile (default: dev, used to load `application-{profile}.yaml`)
+  - `OTEL_TRACING_ENABLED` - Enable OpenTelemetry tracing (default: false)
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP endpoint (e.g. http://localhost:4318 or grpc://localhost:4317)
+  - `OTEL_EXPORTER_OTLP_PROTOCOL` - OTLP protocol (`http/protobuf` or `grpc`)
+  - `OTEL_SERVICE_NAME` - Service name reported in traces (default: googlecalendartoluma-api)
+  - `OTEL_EXCLUDED_URLS` - Regex for excluded URLs (default: /health|/health/)
 
 ### Spring Cloud Config
 
@@ -78,6 +83,17 @@ pip install -r requirements.txt
 export GCAL_EMBED_URL="your_embed_url"
 export LUMA_CALENDAR_API_ID="your_api_id"
 export PORT=5000
+```
+
+### OpenTelemetry Tracing
+
+Enable tracing to send spans to Grafana Tempo (or any OTLP collector):
+
+```bash
+export OTEL_TRACING_ENABLED=true
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_SERVICE_NAME=googlecalendartoluma-api
 ```
 
 3. Run the API:

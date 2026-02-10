@@ -8,6 +8,7 @@ import logging
 from fastapi import FastAPI, APIRouter
 from app.util.config import config, get_logging_level, get_base_route_http
 from app.util.app_config import setup_health_check_logging_filter
+from app.util.tracing import setup_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,9 @@ async def setup_app(app: FastAPI, api_router: APIRouter):
         
         # Setup health check logging filter
         setup_health_check_logging_filter()
+
+        # Setup OpenTelemetry tracing if enabled
+        setup_tracing(app)
         
         # Log the active profile
         deployment_profile = os.getenv('DEPLOYMENT_PROFILE', 'dev')
