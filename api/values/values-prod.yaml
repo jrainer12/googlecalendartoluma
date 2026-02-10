@@ -16,6 +16,16 @@ config:
 env:
   - name: DEPLOYMENT_PROFILE
     value: "prod"
+  - name: OTEL_TRACING_ENABLED
+    value: "true"
+  - name: OTEL_EXPORTER_OTLP_PROTOCOL
+    value: "grpc"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://grafana-alloy-otlp.monitoring.svc.cluster.local:4317"
+  - name: OTEL_SERVICE_NAME
+    value: "googlecalendartoluma-api"
+  - name: OTEL_EXCLUDED_URLS
+    value: "/health|/health/"
   - name: SPRING_CONFIG_USERNAME
     valueFrom:
       secretKeyRef:
